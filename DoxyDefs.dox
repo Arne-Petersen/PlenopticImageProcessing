@@ -1,0 +1,21 @@
+/*! \mainpage A brief introduction to the ModuleFramework MF
+ *
+ * \section intro_sec Introduction
+ *
+ * ???
+ *
+ * \section prereq_sec Requirements and 3rd party libraries
+ *
+ * \subsection prereq_basic Minimum
+ *
+ * For configuration and compilation the CMake build system (minimum version 3.8) is recommended. Project files are available and allow for configuration of features and development environment.
+ *
+ * OpenCV is used for all basic image processing tasks. These includes low level data representation of images as well as import/export from/to standard file formats. Examples and programs make use of OpenCVs build in highgui for command line tools to display images.
+ * 
+ */
+
+/// The modules that are implemented in the framework. They provide the top-level access to algorithms and classes embedded in the framework.
+/// \defgroup Modules Modules
+
+/// Algorithm core of the framework. Includes implementation of available algorithms, data structures and control structures.
+/// \defgroup Runtime Runtime
