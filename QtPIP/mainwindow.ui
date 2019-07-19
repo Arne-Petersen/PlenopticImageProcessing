@@ -2,6 +2,9 @@
 <ui version="4.0">
  <class>MainWindow</class>
  <widget class="QMainWindow" name="MainWindow">
+  <property name="enabled">
+   <bool>true</bool>
+  </property>
   <property name="geometry">
    <rect>
     <x>0</x>
@@ -350,6 +353,5 @@
    <header>QtGraphicsView.hh</header>
   </customwidget>
  </customwidgets>
- <resources/>
  <connections/>
 </ui>
