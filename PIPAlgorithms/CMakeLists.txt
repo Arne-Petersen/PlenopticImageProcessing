@@ -20,6 +20,7 @@
 # header files to be installed
 SET(PIPAlgorithms_HEADER
   PlenopticTools.hh
+  AlgorithmInterfaces.hh
 )
 
 SET(PIPAlgorithms_SRCS
@@ -27,6 +28,7 @@ SET(PIPAlgorithms_SRCS
 )
 
 SET(PIPAlgorithms_CUDA_SRCS
+    CUDA/CudaMinifuncs.cuh
     CUDA/VignettingNormalization.hh
     CUDA/VignettingNormalization.cu
     CUDA/MlaVisualization.hh
@@ -37,6 +39,8 @@ SET(PIPAlgorithms_CUDA_SRCS
     CUDA/DisparityCrosscheck.cu
     CUDA/DisparityEstimation_OFL.hh
     CUDA/DisparityEstimation_OFL.cu
+    CUDA/DisparityEstimation_basic.hh
+    CUDA/DisparityEstimation_basic.cu
  )
 
 ADD_LIBRARY(PIPAlgorithms_CUDA STATIC ${PIPAlgorithms_CUDA_SRCS})

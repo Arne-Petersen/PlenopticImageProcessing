@@ -342,12 +342,12 @@ void QtPlenopticTools::MainWindow::OnSliderValue_changed(const QString& strIdent
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void QtPlenopticTools::MainWindow::OnFormExit_triggered()
 {
-    // For user buttons calling exit only forward close command
+    // Be sure to close external windows, app only stops after all main windows are closed
     if (QObject::sender() == ui->actionExit)
     {
         this->m_pWinSliders->close();
-
         this->close();
+
         return;
     }
 
@@ -792,25 +792,20 @@ void QtPlenopticTools::MainWindow::_ComputeDepth()
             _AppendText("No raw-work image available for depth estimation.");
         }
 
+        // Allocate output images (needed for calls to all CUDA algos)
         CVImage_sptr spDispImage(new CVImage(m_spWorkRawImage->cols(), m_spWorkRawImage->rows(), CV_32FC1, EImageType::GRAYDEPTH));
         CVImage_sptr spWeightImage(new CVImage(m_spWorkRawImage->cols(), m_spWorkRawImage->rows(), CV_32FC1, EImageType::GRAYDEPTH));
         // Set disparity estimation parameters
-        CCUDADisparityEstimation_OFL::SParams params;
+        SParamsDisparityEstimation_OFL params;
         params.descrMla = m_descrHexMLA;
         params.flagRefine = ui->checkBox_Refine->isChecked();
         params.fMinCurvature = m_pSliderWidget->GetValue(PT_SLIDER_ESTIMATOR_MINCURVE);
         params.fDispRange_px = 4.0f * m_descrHexMLA.fMicroLensDistance_px
-                               * float(CCUDADisparityEstimation_OFL_DNORMALIZED_MAX - CCUDADisparityEstimation_OFL_DNORMALIZED_MIN) / float(DISPSTEPS_INITIAL);        
-        //params.fDispRange_px = 3;
-        printf("fdrange : %g\n",params.fDispRange_px);
+                               * float(CCUDADisparityEstimation_OFL_DNORMALIZED_MAX - CCUDADisparityEstimation_OFL_DNORMALIZED_MIN) / float(DISPSTEPS_INITIAL);
         // Apply disparity estimation to raw-image member (normalized with vignetting image if available)
-#pragma message "do not rgba here?"
-        //CVImage_sptr spColRaw = CVImage_sptr(new CVImage());
-        //CDataIO::ImageToRGBA(*spColRaw, *m_spWorkRawImage);
-        //CCUDADisparityEstimation_OFL::Estimate(spDispImage, spWeightImage, spColRaw, params);
-        CCUDADisparityEstimation_OFL::Estimate(spDispImage, spWeightImage, m_spWorkRawImage, params);
-
-        //CCUDAMicrolensFusion::MedianFill<1>(spDispImage, true);
+        CCUDADisparityEstimation_OFL cudaEstimator;
+        cudaEstimator.SetParameters(params);
+        cudaEstimator.EstimateDisparities(spDispImage, spWeightImage, m_spWorkRawImage);
 
         // Clone new depthmap to member (create if neccessary)
         if (m_spLFDepthMap == nullptr)

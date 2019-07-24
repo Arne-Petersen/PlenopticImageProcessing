@@ -1,9 +1,9 @@
 /**
  * Copyright 2019 Arne Petersen, Kiel University
  *
- *    Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
+ *    Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
  *    associated documentation files (the "Software"), to deal in the Software without restriction, including
- *    without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or 
+ *    without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
  *    sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject
  *    to the following conditions:
  *
@@ -18,6 +18,7 @@
  */
 
 #include "DisparityEstimation_OFL.hh"
+#include "CudaMinifuncs.cuh"
 
 #ifdef WIN32
 #include <unistd.h>
@@ -25,11 +26,10 @@
 
 using namespace PIP;
 
-#define OUTPOS_X 1499
-#define OUTPOS_Y 1499
-
-struct SLocalParams
+struct SCudaParams
 {
+    __device__ __host__ SCudaParams() {}
+
     // Block of threads corresponding to center lens
     vec2<float> vGridCenerBlock;
     // Description for MLA (radius etc.)
@@ -38,6 +38,10 @@ struct SLocalParams
     uint width;
     // Raw-image height
     uint height;
+    // Normalized disparity to start estimation
+    float fMinDisparity;
+    // Normalized disparity to stop estimation
+    float fMaxDisparity;
     // Tested disparities in refinement : [dispInit - fDispRange_px/2 ... dispInit + fDispRange_px/2]
     float fDispRange_px;
     // Minimal curvature of cost function at minimum position. 0 no validity filtering, >0.1f strong filtering
@@ -50,9 +54,11 @@ struct SLocalParams
     float cmax;
 
     // Set this from host parameter struct
-    __host__ void Set(const CCUDADisparityEstimation_OFL::SParams& paramsIn,
+    __host__ void Set(const SParamsDisparityEstimation_OFL& paramsIn,
             vec2<float> vGridCenerBlock, const uint width, const uint height)
     {
+        fMinDisparity = paramsIn.fMinCurvature;
+        fMaxDisparity = paramsIn.fMaxDisparity;
         fDispRange_px = paramsIn.fDispRange_px;
         fMinCurvature = paramsIn.fMinCurvature;
         p1f = paramsIn.p1f;
@@ -65,21 +71,9 @@ struct SLocalParams
     }
 };
 
-// Use C enum, external parameter is C++ enum class
-enum CECostFunc
-{
-    MINERROR_SAD = 0,
-    MINERROR_SSD = 1,
-    MAXCURVATURE = 2
-};
-
-__device__ __constant__ SLocalParams globalParams;
+__device__ __constant__ SCudaParams globalParams;
 
 //#define LENSSTEP2
-
-#define LENGTH4(X) (sqrtf(X.x*X.x + X.y*X.y + X.z*X.z + X.w*X.w))
-#define LENGTH2(X) (sqrtf(X.x*X.x + X.y*X.y))
-#define DIST2(X, Y) (sqrtf((X.x-Y.x)*(X.x-Y.x) + (X.y-Y.y)*(X.y-Y.y)))
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 template<const int t_intHWS, const int t_intChannels>
@@ -91,15 +85,15 @@ __device__ float computeSAD_weighted(cudaTextureObject_t& texPlenopticImage,
         // normalized epipolar direction
         const vec2<float>&                                vEpiline,
         // reference image position relative to reference lens
-        const vec2<float>&                                vReferencePixel_px,
+        const vec2<float>&                                vRelativeReferencePixel_px,
         // test disparity in pixel
         const float                                       disparity)
 {
     // get pixel positions in image
-    float2 p1 = make_float2(vReferenceLensCenter_px.x + vReferencePixel_px.x,
-                            vReferenceLensCenter_px.y + vReferencePixel_px.y);
-    float2 p2 = make_float2(vTargetLensCenter_px.x + vReferencePixel_px.x - disparity * vEpiline.x,
-                            vTargetLensCenter_px.y + vReferencePixel_px.y - disparity * vEpiline.y);
+    float2 p1 = make_float2(vReferenceLensCenter_px.x + vRelativeReferencePixel_px.x,
+                            vReferenceLensCenter_px.y + vRelativeReferencePixel_px.y);
+    float2 p2 = make_float2(vTargetLensCenter_px.x + vRelativeReferencePixel_px.x - disparity * vEpiline.x,
+                            vTargetLensCenter_px.y + vRelativeReferencePixel_px.y - disparity * vEpiline.y);
 
     // check if p2 is in c2 (only once, orig per patch pixel)
     if (DIST2(p2, vTargetLensCenter_px) + float(t_intHWS) > globalParams.descrMla.GetMicroImageRadius_px())
@@ -129,10 +123,8 @@ __device__ float computeSAD_weighted(cudaTextureObject_t& texPlenopticImage,
                 float2 Iai = tex2D<float2>(texPlenopticImage, p2.x + i +0.5f, p2.y + j +0.5f);
                 Iai.y *= Ia.y;
                 // add weighted costs
-                //fCostSum += fabs(Ia.x - Iai.x) * Iai.y / Ia.y;
                 fCostSum += fabs(Ia.x - Iai.x) * Iai.y;
                 // sum up weight
-                //fWeightSum += Iai.y / Ia.y;
                 fWeightSum += Iai.y;
             }
             else     // channels == 4
@@ -142,10 +134,8 @@ __device__ float computeSAD_weighted(cudaTextureObject_t& texPlenopticImage,
                 float4 Iai = tex2D<float4>(texPlenopticImage, p2.x + i +0.5f, p2.y + j +0.5f);
                 Iai.w *= Ia.w;
                 // add weighted costs
-                //fCostSum += (fabs(Ia.x - Iai.x) + fabs(Ia.y - Iai.y) + fabs(Ia.z - Iai.z)) * Iai.w / Ia.w;
                 fCostSum += (fabs(Ia.x - Iai.x) + fabs(Ia.y - Iai.y) + fabs(Ia.z - Iai.z)) * Iai.w;
                 // sum up weight
-                //fWeightSum += Iai.w / Ia.w;
                 fWeightSum += Iai.w;
             }
         }
@@ -154,7 +144,7 @@ __device__ float computeSAD_weighted(cudaTextureObject_t& texPlenopticImage,
     // return normalized SAD. Costs are determined for all colors, need to normalize depending on channel count
     if ((t_intChannels == 1)||(t_intChannels == 2))
     {
-        // gray images have only have one cost per pixel
+        // gray images have only have one cost per pixel (for 2 channels second is alpha weight)
         return fCostSum / fWeightSum;
     }
     else     // 4 channel
@@ -194,6 +184,7 @@ __device__ float computeAverageCost(cudaTextureObject_t& texPlenopticImage,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/// For a given pixel (pixelX,pixelY) and a disparity step index, determine index to local cost volume
 template<const int t_CNTDISPSTEPS>
 __device__ inline uint sharedMemoryIndex(uint pixelX, uint pixelY, uint disparityStep)
 {
@@ -259,8 +250,6 @@ __device__ float computeFineRegulatedCost(float* cdata, uint j)
             c += globalParams.p1f;
             d += globalParams.p2f;
 
-            //printf("x : %d, y : %d, j : %d, [a,b,c,d] = [ %g, %g, %g, %g]\n", x,y,j,a,b,c,d);
-
             // add minimal partial cost to cost sum
             sumCost += min(min(min(a, b), c), d);
             // increase count of checked neighbors
@@ -280,6 +269,7 @@ __device__ float computeFineRegulatedCost(float* cdata, uint j)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/// Disparity estimation by simple block matching to neighbor lenses
 template<const int t_CNTDISPSTEPS, const int t_intHWS, const int t_intChannels>
 __global__ void computeDisparity(float * outputData, float* outputWeights, cudaTextureObject_t texPlenopticImage,
         const vec2<float> vGridCenerBlock, const vec2<float> vPixelOffset_px)
@@ -301,48 +291,13 @@ __global__ void computeDisparity(float * outputData, float* outputWeights, cudaT
     { return; }
 
     // target lenses & epipolar lines (or directions v)
-    __shared__ vec2<float> targets[6];
-    __shared__ vec2<float> vs[6];
+    __shared__ vec2<float> arrTargetImageCenters_px[6];
+    __shared__ vec2<float> arrEpilineDir[6];
 
     if(threadIdx.x == 0 && threadIdx.y == 0)
     {
-        const vec2<float> vMicroLensCenter_px = globalParams.descrMla.GetMicroLensCenter_px(vReferenceGridIndex);
-
-        targets[0].x = vReferenceGridIndex.x + 0;
-        targets[0].y = vReferenceGridIndex.y - 1.0f;
-        vs[0] = globalParams.descrMla.GetMicroLensCenter_px(targets[0]) - vMicroLensCenter_px;
-        vs[0].normalize();
-        targets[0] = globalParams.descrMla.GetMicroImageCenter_px(targets[0]);
-
-        targets[1].x = vReferenceGridIndex.x + 1.0f;
-        targets[1].y = vReferenceGridIndex.y - 1.0f;
-        vs[1] = globalParams.descrMla.GetMicroLensCenter_px(targets[1]) - vMicroLensCenter_px;
-        vs[1].normalize();
-        targets[1] = globalParams.descrMla.GetMicroImageCenter_px(targets[1]);
-
-        targets[2].x = vReferenceGridIndex.x + 1.0f;
-        targets[2].y = vReferenceGridIndex.y + 0;
-        vs[2] = globalParams.descrMla.GetMicroLensCenter_px(targets[2]) - vMicroLensCenter_px;
-        vs[2].normalize();
-        targets[2] = globalParams.descrMla.GetMicroImageCenter_px(targets[2]);
-
-        targets[3].x = vReferenceGridIndex.x + 0;
-        targets[3].y = vReferenceGridIndex.y + 1.0f;
-        vs[3] = globalParams.descrMla.GetMicroLensCenter_px(targets[3]) - vMicroLensCenter_px;
-        vs[3].normalize();
-        targets[3] = globalParams.descrMla.GetMicroImageCenter_px(targets[3]);
-
-        targets[4].x = vReferenceGridIndex.x - 1.0f;
-        targets[4].y = vReferenceGridIndex.y + 1.0f;
-        vs[4] = globalParams.descrMla.GetMicroLensCenter_px(targets[4]) - vMicroLensCenter_px;
-        vs[4].normalize();
-        targets[4] = globalParams.descrMla.GetMicroImageCenter_px(targets[4]);
-
-        targets[5].x = vReferenceGridIndex.x - 1.0f;
-        targets[5].y = vReferenceGridIndex.y + 0;
-        vs[5] = globalParams.descrMla.GetMicroLensCenter_px(targets[5]) - vMicroLensCenter_px;
-        vs[5].normalize();
-        targets[5] = globalParams.descrMla.GetMicroImageCenter_px(targets[5]);
+        // Use only 'first' thread in block to generate neighborhoor indices
+        GENERATELENSNEIGHBORS_HEX_L1(arrTargetImageCenters_px, arrEpilineDir, globalParams, vReferenceGridIndex)
     }
 
     // sync all threads for matching
@@ -368,21 +323,16 @@ __global__ void computeDisparity(float * outputData, float* outputWeights, cudaT
     // ignore border pixels
     if (vRelativeReferencePos_px.length() + float(t_intHWS) <  globalParams.descrMla.GetMicroImageRadius_px())
     {
-//        if ((uint(floorf(vRelativeReferencePos_px.y+vMicroImageCenter_px.y + 0.5f)) == OUTPOS_Y)
-//            &&(uint(floorf(vRelativeReferencePos_px.x+vMicroImageCenter_px.x + 0.5f))==OUTPOS_X))
-//            printf("[");
-
         // compute disparity costs for the current pixel (block matching)
         for(uint j=0; j<t_CNTDISPSTEPS; j++)
         {
             // compute average costs (over all target lenses)
-            const float fCost = computeAverageCost<t_intHWS, t_intChannels>(texPlenopticImage, vMicroImageCenter_px, targets, vs,
+            const float fCost = computeAverageCost<t_intHWS, t_intChannels>(texPlenopticImage,
+                                                                            vMicroImageCenter_px,
+                                                                            arrTargetImageCenters_px,
+                                                                            arrEpilineDir,
                                                                             globalParams.descrMla.fMicroLensDistance_px * CCUDADisparityEstimation_OFL_DNORMALIZED_MAX + float(j) * step,
                                                                             vRelativeReferencePos_px);
-
-//            if ((uint(floorf(vRelativeReferencePos_px.y+vMicroImageCenter_px.y + 0.5f)) == OUTPOS_Y)
-//                &&(uint(floorf(vRelativeReferencePos_px.x+vMicroImageCenter_px.x + 0.5f))==OUTPOS_X))
-//                printf("[%d %g];...\n", j, fCost);
 
             // check for minimum cost
             if (fActCost > fCost)
@@ -392,10 +342,6 @@ __global__ void computeDisparity(float * outputData, float* outputWeights, cudaT
                 fActCost = fCost;
             }
         }
-
-//        if ((uint(floorf(vRelativeReferencePos_px.y+vMicroImageCenter_px.y + 0.5f)) == OUTPOS_Y)
-//            &&(uint(floorf(vRelativeReferencePos_px.x+vMicroImageCenter_px.x + 0.5f))==OUTPOS_X))
-//            printf("];\n");
     }
 
     // index in output array
@@ -413,7 +359,7 @@ __global__ void computeDisparity(float * outputData, float* outputWeights, cudaT
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-template<const int t_CNTDISPSTEPS, const int t_intHWS, const int t_intChannels, const int t_eCostFunc>
+template<const int t_CNTDISPSTEPS, const int t_intHWS, const int t_intChannels>
 __global__ void computeDisparity_refine(float * outputData, float* outputWeights, cudaTextureObject_t texPlenopticImage,
         const vec2<float> vPixelOffset_px)
 {
@@ -454,9 +400,6 @@ __global__ void computeDisparity_refine(float * outputData, float* outputWeights
     vPixPos.Set(uint(floorf(vMicroImageCenter_px.x + vRelativeReferencePos_px.x + 0.5f)),
                 uint(floorf(vMicroImageCenter_px.y + vRelativeReferencePos_px.y + 0.5f)));
     const uint index = vPixPos.y*globalParams.width + vPixPos.x;
-//    const uint f =  uint(floorf(vMicroImageCenter_px.x + vRelativeReferencePos_px.x + 0.5f));
-//    const uint g =  uint(floorf(vMicroImageCenter_px.y + vRelativeReferencePos_px.y + 0.5f));
-//    const uint index = g*globalParams.width + f;
 
     // Initial disparity normalized with lens diameter (inter-lens distance)
     const float fInitialDisparityNormalized = outputData[index];
@@ -468,87 +411,16 @@ __global__ void computeDisparity_refine(float * outputData, float* outputWeights
     const float fInitialDisparity_px = fInitialDisparityNormalized*(globalParams.descrMla.fMicroLensDistance_px);
 #endif
 
-    // target lenses & epipolar lines (or directions v)
-    __shared__ vec2<float> targets[6];
-    __shared__ vec2<float> vs[6];
+    // target lenses (pixel position of micro IMAGE center) & epipolar lines (normalized vectors)
+    __shared__ vec2<float> arrTargetImageCenters_px[6];
+    __shared__ vec2<float> arrEpilineDir[6];
 
     if(threadIdx.x == 0 && threadIdx.y == 0)
     {
-        vec2<float> vMicroLensCenter_px = globalParams.descrMla.GetMicroLensCenter_px(vReferenceGridIndex);
-
 #ifdef LENSSTEP2
-        targets[0].x = vReferenceGridIndex.x - 1.0f;
-        targets[0].y = vReferenceGridIndex.y + 2.0f;
-        vs[0] = globalParams.descrMla.GetMicroLensCenter_px(targets[0]) - vMicroLensCenter_px;
-        vs[0].normalize();
-        targets[0] = globalParams.descrMla.GetMicroImageCenter_px(targets[0]);
-
-        targets[1].x = vReferenceGridIndex.x - 1.0f;
-        targets[1].y = vReferenceGridIndex.y - 1.0f;
-        vs[1] = globalParams.descrMla.GetMicroLensCenter_px(targets[1]) - vMicroLensCenter_px;
-        vs[1].normalize();
-        targets[1] = globalParams.descrMla.GetMicroImageCenter_px(targets[1]);
-
-        targets[2].x = vReferenceGridIndex.x - 2.0f;
-        targets[2].y = vReferenceGridIndex.y + 1.0f;
-        vs[2] = globalParams.descrMla.GetMicroLensCenter_px(targets[2]) - vMicroLensCenter_px;
-        vs[2].normalize();
-        targets[2] = globalParams.descrMla.GetMicroImageCenter_px(targets[2]);
-
-        targets[3].x = vReferenceGridIndex.x + 1.0f;
-        targets[3].y = vReferenceGridIndex.y + 1.0f;
-        vs[3] = globalParams.descrMla.GetMicroLensCenter_px(targets[3]) - vMicroLensCenter_px;
-        vs[3].normalize();
-        targets[3] = globalParams.descrMla.GetMicroImageCenter_px(targets[3]);
-
-        targets[4].x = vReferenceGridIndex.x + 2.0f;
-        targets[4].y = vReferenceGridIndex.y - 1.0f;
-        vs[4] = globalParams.descrMla.GetMicroLensCenter_px(targets[4]) - vMicroLensCenter_px;
-        vs[4].normalize();
-        targets[4] = globalParams.descrMla.GetMicroImageCenter_px(targets[4]);
-
-        targets[5].x = vReferenceGridIndex.x + 1.0f;
-        targets[5].y = vReferenceGridIndex.y - 2.0f;
-        vs[5] = globalParams.descrMla.GetMicroLensCenter_px(targets[5]) - vMicroLensCenter_px;
-
-        vs[5].normalize();
-        targets[5] = globalParams.descrMla.GetMicroImageCenter_px(targets[5]);
+        GENERATELENSNEIGHBORS_HEX_L2(arrTargetImageCenters_px, arrEpilineDir, globalParams, vReferenceGridIndex)
 #else //LENSSTEP2
-        targets[0].x = vReferenceGridIndex.x + 0;
-        targets[0].y = vReferenceGridIndex.y - 1.0f;
-        vs[0] = globalParams.descrMla.GetMicroLensCenter_px(targets[0]) - vMicroLensCenter_px;
-        vs[0].normalize();
-        targets[0] = globalParams.descrMla.GetMicroImageCenter_px(targets[0]);
-
-        targets[1].x = vReferenceGridIndex.x + 1.0f;
-        targets[1].y = vReferenceGridIndex.y - 1.0f;
-        vs[1] = globalParams.descrMla.GetMicroLensCenter_px(targets[1]) - vMicroLensCenter_px;
-        vs[1].normalize();
-        targets[1] = globalParams.descrMla.GetMicroImageCenter_px(targets[1]);
-
-        targets[2].x = vReferenceGridIndex.x + 1.0f;
-        targets[2].y = vReferenceGridIndex.y + 0;
-        vs[2] = globalParams.descrMla.GetMicroLensCenter_px(targets[2]) - vMicroLensCenter_px;
-        vs[2].normalize();
-        targets[2] = globalParams.descrMla.GetMicroImageCenter_px(targets[2]);
-
-        targets[3].x = vReferenceGridIndex.x + 0;
-        targets[3].y = vReferenceGridIndex.y + 1.0f;
-        vs[3] = globalParams.descrMla.GetMicroLensCenter_px(targets[3]) - vMicroLensCenter_px;
-        vs[3].normalize();
-        targets[3] = globalParams.descrMla.GetMicroImageCenter_px(targets[3]);
-
-        targets[4].x = vReferenceGridIndex.x - 1.0f;
-        targets[4].y = vReferenceGridIndex.y + 1.0f;
-        vs[4] = globalParams.descrMla.GetMicroLensCenter_px(targets[4]) - vMicroLensCenter_px;
-        vs[4].normalize();
-        targets[4] = globalParams.descrMla.GetMicroImageCenter_px(targets[4]);
-
-        targets[5].x = vReferenceGridIndex.x - 1.0f;
-        targets[5].y = vReferenceGridIndex.y + 0;
-        vs[5] = globalParams.descrMla.GetMicroLensCenter_px(targets[5]) - vMicroLensCenter_px;
-        vs[5].normalize();
-        targets[5] = globalParams.descrMla.GetMicroImageCenter_px(targets[5]);
+        GENERATELENSNEIGHBORS_HEX_L1(arrTargetImageCenters_px, arrEpilineDir, globalParams, vReferenceGridIndex)
 #endif //LENSSTEP2
     }
 
@@ -559,17 +431,10 @@ __global__ void computeDisparity_refine(float * outputData, float* outputWeights
     // sync all threads for fine regularization
     __syncthreads();
 
-//    // Get minimum disparity from initial value and test-range
-//    const float fMinDisp = max(fInitialDisparity_px - globalParams.fDispRange_px / 2.0f,
-//                               globalParams.descrMla.fMicroLensDistance_px * CCUDADisparityEstimation_OFL_DNORMALIZED_MIN);
-//    // Get step width and 'cdata' array index for active pixel
-//    const float step = (min((fMinDisp + globalParams.fDispRange_px),
-//                            globalParams.descrMla.fMicroLensDistance_px * CCUDADisparityEstimation_OFL_DNORMALIZED_MAX)
-//                        - fMinDisp)
-//                       / float(t_CNTDISPSTEPS-1);
-
-    const float fMinDisp = fInitialDisparity_px - globalParams.fDispRange_px / 2.0f;
-    const float step = globalParams.fDispRange_px / float(t_CNTDISPSTEPS-1);
+    // get disparity to start epipolar line search
+    const float fMinDisp_px = fInitialDisparity_px - globalParams.fDispRange_px / 2.0f;
+    // Step width in pixel of one disparity step
+    const float fDisparityStepsize_px = globalParams.fDispRange_px / float(t_CNTDISPSTEPS-1);
 
     const uint pixelIndex = (threadIdx.y * blockDim.x + threadIdx.x) * t_CNTDISPSTEPS;
 
@@ -580,114 +445,54 @@ __global__ void computeDisparity_refine(float * outputData, float* outputWeights
         for(uint j=0; j<t_CNTDISPSTEPS; j++)
         {
             // disparity (to test)
-            disparity = fMinDisp + float(j) * step;
+            disparity = fMinDisp_px + float(j) * fDisparityStepsize_px;
             // compute average costs (over all target lenses)
-            cdata[pixelIndex + j] = computeAverageCost<t_intHWS, t_intChannels>(texPlenopticImage, vMicroImageCenter_px, targets, vs,
-                                                                         disparity, vRelativeReferencePos_px);
+            cdata[pixelIndex + j] = computeAverageCost<t_intHWS, t_intChannels>(texPlenopticImage, vMicroImageCenter_px, arrTargetImageCenters_px, arrEpilineDir,
+                                                                                disparity, vRelativeReferencePos_px);
         }
     }
 
     // sync all threads for fine regularization
     __syncthreads();
 
-//    if ((vPixPos.y == OUTPOS_Y)&&(vPixPos.x==OUTPOS_X))
-//        printf("[");
+    // compute disparity (with lowest associated cost)
+    float c_min = globalParams.cmax;
+    int bestIdx=-1;
 
-    switch (t_eCostFunc)
+    float f[t_CNTDISPSTEPS];
+    for(uint j = 0; j < t_CNTDISPSTEPS; j++)
     {
-      case CECostFunc::MINERROR_SAD:
-      case CECostFunc::MINERROR_SSD:
-      {
-          // compute disparity (with lowest associated cost)
-          float c_min = globalParams.cmax;
-          int bestIdx=-1;
+        f[j] = computeFineRegulatedCost<t_CNTDISPSTEPS, t_intHWS>(cdata, j);
 
-          //if ((vPixPos.y != OUTPOS_Y)||(vPixPos.x!=OUTPOS_X))
-          //    break;
-
-          float f[t_CNTDISPSTEPS];
-          for(uint j = 0; j < t_CNTDISPSTEPS; j++)
-          {
-              f[j] = computeFineRegulatedCost<t_CNTDISPSTEPS, t_intHWS>(cdata, j);
-
-//              if ((vPixPos.y == OUTPOS_Y)&&(vPixPos.x==OUTPOS_X))
-//                  printf("[%d %g];...\n", j, f[j]);
-
-              if(f[j] < c_min)
-              {
-                  c_min = f[j];
-                  bestIdx = j;
-              }
-          }
-
-          // compute curvature at cost minimum
-          float fCurvature=0;
-          if ((bestIdx > 0)&&(bestIdx < t_CNTDISPSTEPS-1))
-          {
-              fCurvature = (f[bestIdx-1] -  f[bestIdx] + f[bestIdx+1] - f[bestIdx]) / step;
-          }
-
-          // Only write output for valid image boundaries and microlens areas
-          if ((index < globalParams.width*globalParams.height)
-              &&(vRelativeReferencePos_px.length() + float(t_intHWS) < globalParams.descrMla.GetMicroImageRadius_px()))
-          {
-              // output data format: normalize float by matched baselines
-#ifdef LENSSTEP2
-              outputData[index] = float(fCurvature>globalParams.fMinCurvature) * (fMinDisp + float(bestIdx) * step) / (1.73205f*globalParams.descrMla.fMicroLensDistance_px);
-#else // LENSSTEP2
-              outputData[index] = float(fCurvature>globalParams.fMinCurvature) * (fMinDisp + float(bestIdx) * step) / (globalParams.descrMla.fMicroLensDistance_px);
-#endif // LENSSTEP2
-              outputWeights[index] = fCurvature;
-          }
-
-//          if ((vPixPos.y == OUTPOS_Y)&&(vPixPos.x==OUTPOS_X))
-//              printf("];\n");
-
-          break;
-      }
-
-      case CECostFunc::MAXCURVATURE:
-      {
-          // Array of cost function values for all disparity steps
-          float f[t_CNTDISPSTEPS];
-          for(uint j=0; j<t_CNTDISPSTEPS; j++)
-          {
-              f[j] = computeFineRegulatedCost<t_CNTDISPSTEPS, t_intHWS>(cdata, j);
-          }
-
-          // compute disparity (with lowest associated cost)
-          float maxCurvature=0;
-          int bestIdx=-1;
-          for (int i=1; i < t_CNTDISPSTEPS-1; ++i)
-          {
-              float var = (f[i-1] -  f[i] + f[i+1] - f[i]) / step;
-              if (var > maxCurvature)
-              {
-                  maxCurvature=var;
-                  bestIdx=i;
-              }
-          }
-
-          if ((index < globalParams.width*globalParams.height)
-              &&(vRelativeReferencePos_px.length() + float(t_intHWS) < globalParams.descrMla.GetMicroImageRadius_px()))
-          {
-              // output data format: normalize float by lens diameter
-#ifdef LENSSTEP2
-              outputData[index] = float(maxCurvature>globalParams.fMinCurvature) * (fMinDisp + float(bestIdx) * step) / (1.73205f*globalParams.descrMla.fMicroLensDistance_px);
-#else // LENSSTEP2
-              outputData[index] = float(maxCurvature>globalParams.fMinCurvature) * (fMinDisp + float(bestIdx) * step) / (globalParams.descrMla.fMicroLensDistance_px);
-#endif // LENSSTEP2
-              outputWeights[index] = maxCurvature;
-          }
-          else if (vRelativeReferencePos_px.length() + float(t_intHWS) < globalParams.descrMla.fMicroLensDistance_px/2.0f)
-          {
-              outputData[index] = 0.0f;
-              outputWeights[index] = 0.0f;
-          }
-
-          break;
-      }
+        if(f[j] < c_min)
+        {
+            c_min = f[j];
+            bestIdx = j;
+        }
     }
+
+    // compute curvature at cost minimum
+    float fCurvature=0;
+    if ((bestIdx > 0)&&(bestIdx < t_CNTDISPSTEPS-1))
+    {
+        fCurvature = (f[bestIdx-1] -  f[bestIdx] + f[bestIdx+1] - f[bestIdx]) / fDisparityStepsize_px;
+    }
+
+    // Only write output for valid image boundaries and microlens areas
+    if ((index < globalParams.width*globalParams.height)
+        &&(vRelativeReferencePos_px.length() + float(t_intHWS) < globalParams.descrMla.GetMicroImageRadius_px()))
+    {
+        // output data format: normalize float by matched baselines
+#ifdef LENSSTEP2
+        outputData[index] = float(fCurvature>globalParams.fMinCurvature) * (fMinDisp_px + float(bestIdx) * fDisparityStepsize_px)
+                            / (1.73205f*globalParams.descrMla.fMicroLensDistance_px);
+#else // LENSSTEP2
+        outputData[index] = float(fCurvature>globalParams.fMinCurvature) * (fMinDisp_px + float(bestIdx) * fDisparityStepsize_px)
+                            / (globalParams.descrMla.fMicroLensDistance_px);
+#endif // LENSSTEP2
+        outputWeights[index] = fCurvature;
+    }
+
 }
 
 
@@ -700,7 +505,14 @@ inline void StartDisparityKernel(const dim3 lensDims, const dim3 threadsPerLensD
         const vec2<float> vPixelOffset_px)
 {
     // Call kernel with appropriate channel count
-    if (intChannelCount == 2)
+    if (intChannelCount == 1)
+    {
+        computeDisparity<DISPSTEPS_INITIAL, HWS_INITIAL, 1><<<lensDims, threadsPerLensDims>>>(arrOutput.GetDevicePointer(), arrOutWeightSum.GetDevicePointer(),
+                                                                                              texInput.GetTextureObject(),
+                                                                                              vGridCenerBlock,
+                                                                                              vPixelOffset_px);
+    }
+    else if (intChannelCount == 2)
     {
         computeDisparity<DISPSTEPS_INITIAL, HWS_INITIAL, 2><<<lensDims, threadsPerLensDims>>>(arrOutput.GetDevicePointer(), arrOutWeightSum.GetDevicePointer(),
                                                                                               texInput.GetTextureObject(),
@@ -719,58 +531,29 @@ inline void StartDisparityKernel(const dim3 lensDims, const dim3 threadsPerLensD
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /// local inliner to start CUDA kernel parametrizing pixel offset for sub-lens area selection
 inline void StartDisparityRefinementKernel(const dim3 lensDims, const dim3 threadsPerLensDims, const int intSharedMemSize,
-        const int intChannelCount, const CECostFunc eCostFunc,
-        CCUDAImageArray<float>& arrOutput, CCUDAImageArray<float>& arrOutWeightSum,
+        const int intChannelCount, CCUDAImageArray<float>& arrOutput, CCUDAImageArray<float>& arrOutWeightSum,
         CCUDAImageTexture& texInput,
         const vec2<float> vPixelOffset_px)
 {
-    switch (eCostFunc)
+    if (intChannelCount == 1)
     {
-      case CECostFunc::MINERROR_SAD:
-          if (intChannelCount == 2)
-          {
-              computeDisparity_refine<DISPSTEPS_REFINE, HWS_REFINE, 2, int(CECostFunc::MINERROR_SAD)><<<lensDims, threadsPerLensDims, intSharedMemSize>>>
-              (arrOutput.GetDevicePointer(), arrOutWeightSum.GetDevicePointer(), texInput.GetTextureObject(), vPixelOffset_px);
-          }
-          else
-          {
-              computeDisparity_refine<DISPSTEPS_REFINE, HWS_REFINE, 4, int(CECostFunc::MINERROR_SAD)><<<lensDims, threadsPerLensDims, intSharedMemSize>>>
-              (arrOutput.GetDevicePointer(), arrOutWeightSum.GetDevicePointer(), texInput.GetTextureObject(), vPixelOffset_px);
-          }
-          break;
-
-      case CECostFunc::MINERROR_SSD:
-          if (intChannelCount == 2)
-          {
-              computeDisparity_refine<DISPSTEPS_REFINE, HWS_REFINE, 2, int(CECostFunc::MINERROR_SSD)><<<lensDims, threadsPerLensDims, intSharedMemSize>>>
-              (arrOutput.GetDevicePointer(), arrOutWeightSum.GetDevicePointer(), texInput.GetTextureObject(), vPixelOffset_px);
-          }
-          else
-          {
-              computeDisparity_refine<DISPSTEPS_REFINE, HWS_REFINE, 4, int(CECostFunc::MINERROR_SSD)><<<lensDims, threadsPerLensDims, intSharedMemSize>>>
-              (arrOutput.GetDevicePointer(), arrOutWeightSum.GetDevicePointer(), texInput.GetTextureObject(), vPixelOffset_px);
-          }
-          break;
-
-      case CECostFunc::MAXCURVATURE:
-          if (intChannelCount == 2)
-          {
-              computeDisparity_refine<DISPSTEPS_REFINE, HWS_REFINE, 2, int(CECostFunc::MAXCURVATURE)><<<lensDims, threadsPerLensDims, intSharedMemSize>>>
-              (arrOutput.GetDevicePointer(), arrOutWeightSum.GetDevicePointer(), texInput.GetTextureObject(), vPixelOffset_px);
-          }
-          else
-          {
-              computeDisparity_refine<DISPSTEPS_REFINE, HWS_REFINE, 4, int(CECostFunc::MAXCURVATURE)><<<lensDims, threadsPerLensDims, intSharedMemSize>>>
-              (arrOutput.GetDevicePointer(), arrOutWeightSum.GetDevicePointer(), texInput.GetTextureObject(), vPixelOffset_px);
-          }
-          break;
+        computeDisparity_refine<DISPSTEPS_REFINE, HWS_REFINE, 1><<<lensDims, threadsPerLensDims, intSharedMemSize>>>
+        (arrOutput.GetDevicePointer(), arrOutWeightSum.GetDevicePointer(), texInput.GetTextureObject(), vPixelOffset_px);
+    }
+    else if (intChannelCount == 2)
+    {
+        computeDisparity_refine<DISPSTEPS_REFINE, HWS_REFINE, 2><<<lensDims, threadsPerLensDims, intSharedMemSize>>>
+        (arrOutput.GetDevicePointer(), arrOutWeightSum.GetDevicePointer(), texInput.GetTextureObject(), vPixelOffset_px);
+    }
+    else
+    {
+        computeDisparity_refine<DISPSTEPS_REFINE, HWS_REFINE, 4><<<lensDims, threadsPerLensDims, intSharedMemSize>>>
+        (arrOutput.GetDevicePointer(), arrOutWeightSum.GetDevicePointer(), texInput.GetTextureObject(), vPixelOffset_px);
     }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-void CCUDADisparityEstimation_OFL::Estimate(CVImage_sptr& spDisparties, CVImage_sptr& spWeights,
-        const CVImage_sptr& spPlenopticImage,
-        const CCUDADisparityEstimation_OFL::SParams& params)
+void CCUDADisparityEstimation_OFL::EstimateDisparities(CVImage_sptr& spDisparties, CVImage_sptr& spWeights, const CVImage_sptr& spPlenopticImage)
 {
     cudaError_t e;
 
@@ -799,7 +582,7 @@ void CCUDADisparityEstimation_OFL::Estimate(CVImage_sptr& spDisparties, CVImage_
 
     // Diameter of full lens in number of pixels
     //    descrMLA.fMicroLensDistance_px is distance between projection centers. Use scaled radius of mirco image distance
-    const int intNumFullLensPixel = int(ceil(params.descrMla.fMlaImageScale * params.descrMla.fMicroLensDistance_px));
+    const int intNumFullLensPixel = int(ceil(m_params.descrMla.fMlaImageScale * m_params.descrMla.fMicroLensDistance_px));
     // If lenses are larger than 31 pixel, CUDA kernel cannot cover full lens. Apply partitioning to 31x31 blocks
     const int intNumPixelX = min(intNumFullLensPixel, 31);
     const int intNumPixel = intNumPixelX*intNumPixelX;
@@ -807,7 +590,7 @@ void CCUDADisparityEstimation_OFL::Estimate(CVImage_sptr& spDisparties, CVImage_
     const int intNumBlocks = intNumFullLensPixel / 32 + 1;
 
     // Number of lenses in X-axis of ! MLA !
-    const int intNumLensXdir = int(ceil( float(spPlenopticImage->cols()) / (params.descrMla.fMlaImageScale * params.descrMla.fMicroLensDistance_px) ));
+    const int intNumLensXdir = int(ceil( float(spPlenopticImage->cols()) / (m_params.descrMla.fMlaImageScale * m_params.descrMla.fMicroLensDistance_px) ));
     // Resulting number on Y-axis for hex-grid
     const int intNumLensYdir = int(ceil(double(intNumLensXdir) / sin(MF_PI/3.0)));
 
@@ -820,10 +603,10 @@ void CCUDADisparityEstimation_OFL::Estimate(CVImage_sptr& spDisparties, CVImage_
     vGridCenerBlock.Set(0.5f*(float(lensDims.x)-1.0f), 0.5f*(float(lensDims.y)-1.0f));
     printf("starting kernel with lensDims [%d,%d], threadsPerLensDims [%d,%d]\n", lensDims.x, lensDims.y, threadsPerLensDims.x, threadsPerLensDims.y);
 
-    SLocalParams cudaParams;
-    cudaParams.Set(params, vGridCenerBlock, uint(spPlenopticImage->cols()), uint(spPlenopticImage->rows()));
+    SCudaParams cudaParams;
+    cudaParams.Set(m_params, vGridCenerBlock, uint(spPlenopticImage->cols()), uint(spPlenopticImage->rows()));
 
-    cudaMemcpyToSymbol(globalParams, &cudaParams, sizeof(SLocalParams));
+    cudaMemcpyToSymbol(globalParams, &cudaParams, sizeof(SCudaParams));
     if ((e = cudaGetLastError()) != 0)
     {
         throw CRuntimeException(std::string("PIP::CCUDADisparityEstimation_OFL::Estimate : CUDA copy-to-symbol : \"") + std::string(cudaGetErrorString(e)));
@@ -864,7 +647,7 @@ void CCUDADisparityEstimation_OFL::Estimate(CVImage_sptr& spDisparties, CVImage_
     }
 
     // Skip refinement if not requested
-    if (params.flagRefine == false)
+    if (m_params.flagRefine == false)
         return;
 
     const int intSharedMemSize = DISPSTEPS_REFINE * intNumPixel * sizeof(float);
@@ -878,7 +661,7 @@ void CCUDADisparityEstimation_OFL::Estimate(CVImage_sptr& spDisparties, CVImage_
         {
             vPixelOffset_px.Set( float(iX*intNumPixelX) + float(intNumPixelX)/2.0f - float(intNumFullLensPixel)/2.0f,
                                  float(iY*intNumPixelX) + float(intNumPixelX)/2.0f - float(intNumFullLensPixel)/2.0f);
-            StartDisparityRefinementKernel(lensDims, threadsPerLensDims, intSharedMemSize, spPlenopticImage->CvMat().channels(), CECostFunc(params.eCostFunc),
+            StartDisparityRefinementKernel(lensDims, threadsPerLensDims, intSharedMemSize, spPlenopticImage->CvMat().channels(),
                                            arrOutput, arrOutWeightSum, texInput, vPixelOffset_px);
         }
     }
@@ -899,5 +682,5 @@ void CCUDADisparityEstimation_OFL::Estimate(CVImage_sptr& spDisparties, CVImage_
         printf("disparity refinement estimation %g [ms]\n", milliseconds);
     }
 
-    // exit : all CCUDAImage* will be destroyed and data is copied
+    // exit : all CCUDAImage.. will be destroyed and data is copied
 }

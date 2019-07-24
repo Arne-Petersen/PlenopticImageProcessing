@@ -21,64 +21,40 @@
 
 #include "PIPAlgorithms/AlgorithmInterfaces.hh"
 
-/////////////////////////////////////////////////////////////////////////
-/// default value macros...
-// max possible difference per pixel
-#define CCUDADisparityEstimation_OFL_CMAX (0.3f)
-// penalties for deviations of one disparity step (p1f) or more (p2f)
-#define CCUDADisparityEstimation_OFL_P1F (0.0001f)
-#define CCUDADisparityEstimation_OFL_P2F (0.005f)
-// max disparity (factor of lens radius)
-#define CCUDADisparityEstimation_OFL_DNORMALIZED_MAX 0.55f
-#define CCUDADisparityEstimation_OFL_DNORMALIZED_MIN 0.01f
+#define DISPSTEPS_BASIC 150
+#define BLOCKHWS_BASIC 1
 
-/////////////////////////////////////////////////////////////////////////
-/// fixed parameter macros... \todo move to configuration
-#define HWS_INITIAL 1
-#define HWS_REFINE 1
-#define DISPSTEPS_INITIAL 50
-#define DISPSTEPS_REFINE 12
-
-/////////////////////////////////////////////////////////////////////////
 namespace  PIP
 {
+
 ///
-/// \brief The SParamsDisparityEstimation_OFL struct stores parameters for
-///        disparity estimation using \ref CCUDADisparityEstimation_OFL
+/// \brief The SParamsDisparityEstimation_basic struct stores parameters for
+///        disparity estimation using \ref CCUDADisparityEstimation_basic
 ///
-struct SParamsDisparityEstimation_OFL
+struct SParamsDisparityEstimation_basic
 {
     // Description for MLA (radius etc.)
     SPlenCamDescription<true> descrMla;
     // Normalized disparity to start estimation
-    float fMinDisparity = CCUDADisparityEstimation_OFL_DNORMALIZED_MIN;
+    float fMinDisparity = 0;
     // Normalized disparity to stop estimation
-    float fMaxDisparity = CCUDADisparityEstimation_OFL_DNORMALIZED_MAX;
-    // Tested disparities in refinement : [dispInit - fDispRange_px/2 ... dispInit + fDispRange_px/2]
-    float fDispRange_px = 2.0f;
+    float fMaxDisparity = 0.6f;
     // Minimal curvature of cost function at minimum position. 0 no validity filtering, >0.1f strong filtering
     float fMinCurvature = 0.0f;
-    //
-    float p1f = CCUDADisparityEstimation_OFL_P1F;
-    //
-    float p2f = CCUDADisparityEstimation_OFL_P2F;
-    //
-    float cmax = CCUDADisparityEstimation_OFL_CMAX;
-    //
-    bool flagRefine = true;
 };
 
 ///
-/// \brief The CCUDADisparityEstimation_OFL class wraps parameters and CUDA kernel call for
-///        disparity estimations. Uses algorithm from \todo reference
+/// \brief The CCUDADisparityEstimation_basic class wraps parameters and CUDA kernel call for
+///        disparity estimation using simple blockmatching to direct neighbor lenses. Pixel cost
+///        is defined as sum of costs of all neighbor lenses matching
 ///
-class CCUDADisparityEstimation_OFL final : public IDisparityEstimation<SParamsDisparityEstimation_OFL>
+class CCUDADisparityEstimation_basic final : public IDisparityEstimation<SParamsDisparityEstimation_basic>
 {
 public:
-    CCUDADisparityEstimation_OFL() {}
-    virtual ~CCUDADisparityEstimation_OFL() {}
+    CCUDADisparityEstimation_basic() {}
+    virtual ~CCUDADisparityEstimation_basic() {}
 
-    virtual void SetParameters(const SParamsDisparityEstimation_OFL& params)
+    virtual void SetParameters(const SParamsDisparityEstimation_basic& params)
     {
         m_params = params;
     }
@@ -90,14 +66,14 @@ public:
     /// \param spPlenopticImage input image
     ///
     /// The estimated disparities are normalized with active baseline. That is, the disparity
-    /// in [px] is normalized with the matched lens' center distance in [px].
+    /// in [px] is normalized with the lens baseline in [px].
     /// Not matched (range checks etc) or removed (e.g. due to min. curvature) are set to 0.
     ///
     virtual void EstimateDisparities(CVImage_sptr& spDisparties, CVImage_sptr& spWeights, const CVImage_sptr& spPlenopticImage);
 
 protected:
     /// Struct containing external parameters for estimation
-    SParamsDisparityEstimation_OFL m_params;
+    SParamsDisparityEstimation_basic m_params;
 };
 
 }
