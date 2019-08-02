@@ -42,19 +42,16 @@ namespace PIP
         ///
         /// \brief DrawGridToImage visualizes the given MLA description as overlay in the plenoptic image
         ///
-        template<const bool T_HEXBASE>
-        static void DrawGridToImage(CVImage_sptr& spImage, const SPlenCamDescription<T_HEXBASE>& descrMLA);
+        static void DrawGridToImage(CVImage_sptr& spImage, const SPlenCamDescription& descrMLA);
 
         ///
         /// \brief ReadMlaDescription tries imports MLA description from given file
         ///
-        template<const bool T_HEXBASE>
-        static void ReadMlaDescription(SPlenCamDescription<T_HEXBASE>& descrMLA, const std::string& strFilename);
+        static void ReadMlaDescription(SPlenCamDescription& descrMLA, const std::string& strFilename);
 
         ///
         /// \brief WriteMlaDescription exports a MLA descritpion to a named file
         ///
-        template<const bool T_HEXBASE>
-        static void WriteMlaDescription(const SPlenCamDescription<T_HEXBASE>& descrMLA, const std::string& strFilename);
+        static void WriteMlaDescription(const SPlenCamDescription& descrMLA, const std::string& strFilename);
     };
 }

@@ -136,7 +136,7 @@ struct MTEuclid3
     {
         MTEuclid3<T> tfIdentity;
         tfIdentity.R_r_l.SetIdentity();
-        tfIdentity.t_rl_l = vec3<T>(T(0), T(0), T(0));
+        tfIdentity.t_rl_l.Set(T(0), T(0), T(0));
         return tfIdentity;
     }
 

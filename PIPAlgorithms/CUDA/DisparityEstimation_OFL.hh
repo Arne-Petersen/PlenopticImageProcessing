@@ -49,7 +49,7 @@ namespace  PIP
 struct SParamsDisparityEstimation_OFL
 {
     // Description for MLA (radius etc.)
-    SPlenCamDescription<true> descrMla;
+    SPlenCamDescription descrMla;
     // Normalized disparity to start estimation
     float fMinDisparity = CCUDADisparityEstimation_OFL_DNORMALIZED_MIN;
     // Normalized disparity to stop estimation
@@ -72,13 +72,13 @@ struct SParamsDisparityEstimation_OFL
 /// \brief The CCUDADisparityEstimation_OFL class wraps parameters and CUDA kernel call for
 ///        disparity estimations. Uses algorithm from \todo reference
 ///
-class CCUDADisparityEstimation_OFL final : public IDisparityEstimation<SParamsDisparityEstimation_OFL>
+class CCUDADisparityEstimation_OFL final : public IDisparityEstimation
 {
 public:
     CCUDADisparityEstimation_OFL() {}
     virtual ~CCUDADisparityEstimation_OFL() {}
 
-    virtual void SetParameters(const SParamsDisparityEstimation_OFL& params)
+    void SetParameters(const SParamsDisparityEstimation_OFL& params)
     {
         m_params = params;
     }

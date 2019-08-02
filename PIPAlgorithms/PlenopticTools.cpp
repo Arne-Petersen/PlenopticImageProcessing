@@ -1,9 +1,9 @@
 /**
  * Copyright 2019 Arne Petersen, Kiel University
  *
- *    Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
+ *    Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
  *    associated documentation files (the "Software"), to deal in the Software without restriction, including
- *    without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or 
+ *    without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
  *    sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject
  *    to the following conditions:
  *
@@ -23,13 +23,12 @@
 
 using namespace PIP;
 
-template<const bool T_HEXBASE>
-void CPlenopticTools::DrawGridToImage(CVImage_sptr& spImage, const SPlenCamDescription<T_HEXBASE> &descrMLA)
+void CPlenopticTools::DrawGridToImage(CVImage_sptr& spImage, const SPlenCamDescription &descrMLA)
 {
     if ((spImage->type() != CV_8UC1)&&(spImage->type() != CV_8UC3)&&(spImage->type() != CV_8UC4))
     {
         throw CRuntimeException("DrawGridToImage only implemented for uchar images.",
-                                  ERuntimeExcpetionType::ILLEGAL_ARGUMENT);
+                                ERuntimeExcpetionType::ILLEGAL_ARGUMENT);
     }
 
     const int intImageWidth = spImage->cols();
@@ -39,10 +38,18 @@ void CPlenopticTools::DrawGridToImage(CVImage_sptr& spImage, const SPlenCamDescr
     {
         for (int x=0; x<intImageWidth; ++x)
         {
-            const vec2<float> vLensGridIdx = descrMLA.PixelToLensImageGrid(vec2<float>((float)(x), (float)(y)));
-            const vec2<float> vLensGridIdx_rounded = descrMLA.GridRound(vLensGridIdx);
+            const vec2<float> vLensGridIdx = (descrMLA.eGridType == EGridType::HEXAGONAL) ?
+                                             descrMLA.PixelToLensImageGrid<EGridType::HEXAGONAL>(vec2<float>((float) (x), (float) (y)))
+                                             : descrMLA.PixelToLensImageGrid<EGridType::RECTANGULAR>(vec2<float>((float) (x), (float) (y)));
 
-            const vec2<float> vLensGridPixPos_rounded_px = descrMLA.LensCenterGridToPixel(vLensGridIdx_rounded);
+            const vec2<float> vLensGridIdx_rounded = (descrMLA.eGridType == EGridType::HEXAGONAL) ?
+                                                     descrMLA.GridRound<EGridType::HEXAGONAL>(vLensGridIdx)
+                                                     : descrMLA.GridRound<EGridType::RECTANGULAR>(vLensGridIdx);
+
+            const vec2<float> vLensGridPixPos_rounded_px = (descrMLA.eGridType == EGridType::HEXAGONAL) ?
+                                                           descrMLA.LensCenterGridToPixel<EGridType::HEXAGONAL>(vLensGridIdx_rounded)
+                                                           : descrMLA.LensCenterGridToPixel<EGridType::RECTANGULAR>(vLensGridIdx_rounded);
+
             const float fLensCenterDist_px = (vec2<float>(float(x), float(y)) - vLensGridPixPos_rounded_px).length();
             if (fLensCenterDist_px <= 0.05f*descrMLA.fMicroLensDistance_px)
             {
@@ -52,7 +59,10 @@ void CPlenopticTools::DrawGridToImage(CVImage_sptr& spImage, const SPlenCamDescr
                 }
             }
 
-            const vec2<float> vMImageCenter_px = descrMLA.LensImageGridToPixel(vLensGridIdx_rounded);
+            const vec2<float> vMImageCenter_px = (descrMLA.eGridType == EGridType::HEXAGONAL) ?
+                        descrMLA.LensImageGridToPixel(vLensGridIdx_rounded)
+                      :descrMLA.LensImageGridToPixel(vLensGridIdx_rounded);
+
             const double fLensImageDist_px = (vec2<float>(float(x), float(y)) - vMImageCenter_px).length();
             if (fLensImageDist_px >= 0.48*descrMLA.fMicroLensDistance_px)
             {
@@ -66,8 +76,7 @@ void CPlenopticTools::DrawGridToImage(CVImage_sptr& spImage, const SPlenCamDescr
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
-template<const bool T_HEXBASE>
-void CPlenopticTools::ReadMlaDescription(SPlenCamDescription<T_HEXBASE>& descrMLA, const std::string& strFilename)
+void CPlenopticTools::ReadMlaDescription(SPlenCamDescription& descrMLA, const std::string& strFilename)
 {
     // Try to open xml file
     cv::FileStorage fs(strFilename, cv::FileStorage::READ);
@@ -82,20 +91,11 @@ void CPlenopticTools::ReadMlaDescription(SPlenCamDescription<T_HEXBASE>& descrML
     bool isHexBase;
     //fs["IsHexGrid"] >> isHexBase;
     nodeMlaDescription >> isHexBase;
-    if (T_HEXBASE == true)
-    {
-        if (isHexBase == false)
-        {
-            throw CRuntimeException("Hexagonal grid expected but invalid.", ERuntimeExcpetionType::ILLEGAL_ARGUMENT);
-        }
-    }
+
+    if (isHexBase == true)
+        descrMLA.eGridType = EGridType::HEXAGONAL;
     else
-    {
-        if (isHexBase == true)
-        {
-            throw CRuntimeException("Rectangular grid expected but invalid.", ERuntimeExcpetionType::ILLEGAL_ARGUMENT);
-        }
-    }
+        descrMLA.eGridType = EGridType::RECTANGULAR;
 
     nodeMlaDescription["GridRotRAD"] >> descrMLA.fGridRot_rad;
 
@@ -108,8 +108,8 @@ void CPlenopticTools::ReadMlaDescription(SPlenCamDescription<T_HEXBASE>& descrML
     else
     {
         auto it = n.begin();
-        descrMLA.vMlaCenter_px.x = (float)*(it++);
-        descrMLA.vMlaCenter_px.y = (float)*(it);
+        descrMLA.vMlaCenter_px.x = (float) *(it++);
+        descrMLA.vMlaCenter_px.y = (float) *(it);
     }
 
     // read sensor pixel resolution as integer vec2
@@ -121,8 +121,8 @@ void CPlenopticTools::ReadMlaDescription(SPlenCamDescription<T_HEXBASE>& descrML
     else
     {
         auto it = n.begin();
-        descrMLA.viSensorRes_px.x = (int)*(it++);
-        descrMLA.viSensorRes_px.y = (int)*(it);
+        descrMLA.viSensorRes_px.x = (int) *(it++);
+        descrMLA.viSensorRes_px.y = (int) *(it);
     }
 
     // read micro lens distance in pixel as float
@@ -142,8 +142,8 @@ void CPlenopticTools::ReadMlaDescription(SPlenCamDescription<T_HEXBASE>& descrML
     else
     {
         auto it = n.begin();
-        descrMLA.vfMainPrincipalPoint_px.x = (float)*(it++);
-        descrMLA.vfMainPrincipalPoint_px.y = (float)*(it);
+        descrMLA.vfMainPrincipalPoint_px.x = (float) *(it++);
+        descrMLA.vfMainPrincipalPoint_px.y = (float) *(it);
     }
 
     n = nodeMlaDescription["MicroLensFocalLengthPX"];
@@ -187,8 +187,7 @@ void CPlenopticTools::ReadMlaDescription(SPlenCamDescription<T_HEXBASE>& descrML
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
-template<const bool T_HEXBASE>
-void CPlenopticTools::WriteMlaDescription(const SPlenCamDescription<T_HEXBASE>& descrMLA, const std::string& strFilename)
+void CPlenopticTools::WriteMlaDescription(const SPlenCamDescription& descrMLA, const std::string& strFilename)
 {
     // Try to open xml file
     cv::FileStorage fs(strFilename, cv::FileStorage::WRITE);
@@ -201,7 +200,7 @@ void CPlenopticTools::WriteMlaDescription(const SPlenCamDescription<T_HEXBASE>& 
     fs << "MlaDescription" << "{";
 
     /// \todo write pose to file
-    if (T_HEXBASE == true)
+    if (descrMLA.eGridType == EGridType::HEXAGONAL)
     {
         fs << "IsHexGrid" << true;
     }
@@ -225,15 +224,3 @@ void CPlenopticTools::WriteMlaDescription(const SPlenCamDescription<T_HEXBASE>& 
     fs << "}";
 }
 
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/// TEMPLATE INSTANTIATIONS
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-template void PIP::CPlenopticTools::DrawGridToImage<false>(CVImage_sptr& spImage, const SPlenCamDescription<false> &descrMLA);
-template void PIP::CPlenopticTools::DrawGridToImage<true>(CVImage_sptr& spImage, const SPlenCamDescription<true> &descrMLA);
-
-template void PIP::CPlenopticTools::ReadMlaDescription<false>(SPlenCamDescription<false>& descrMLA, const std::string& strFilename);
-template void PIP::CPlenopticTools::ReadMlaDescription<true>(SPlenCamDescription<true>& descrMLA, const std::string& strFilename);
-
-template void PIP::CPlenopticTools::WriteMlaDescription<false>(const SPlenCamDescription<false>& descrMLA, const std::string& strFilename);
-template void PIP::CPlenopticTools::WriteMlaDescription<true>(const SPlenCamDescription<true>& descrMLA, const std::string& strFilename);

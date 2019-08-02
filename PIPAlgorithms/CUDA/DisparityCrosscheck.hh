@@ -39,7 +39,7 @@ public:
     /// NOTE : \ref spDispartiesOut and \ref spDispartiesIn are allowed to be the same image (identical reference)
     ///
     static void Estimate(CVImage_sptr& spDispartiesOut, const CVImage_sptr& spDispartiesIn,
-                         const SPlenCamDescription<true>& descrMla, const float fMaxDispDiff);
+                         const SPlenCamDescription& descrMla, const float fMaxDispDiff);
 
 protected:
     CCUDADisparityCrosscheck() {}

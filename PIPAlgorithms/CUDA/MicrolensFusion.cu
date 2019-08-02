@@ -1,9 +1,9 @@
 /**
  * Copyright 2019 Arne Petersen, Kiel University
  *
- *    Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
+ *    Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
  *    associated documentation files (the "Software"), to deal in the Software without restriction, including
- *    without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or 
+ *    without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
  *    sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject
  *    to the following conditions:
  *
@@ -26,7 +26,7 @@ struct SLocalParams
     // Description of target camera
     PIP::MTCamProjection<float> projTarget;
     // Description for MLA (radius etc.)
-    SPlenCamDescription<true> descrMla;
+    SPlenCamDescription descrMla;
     // Bounding box upper left pixel in plenoptic image
     vec2<int> vUpperLeft;
     // Bounding box upper left pixel in plenoptic image
@@ -46,7 +46,7 @@ __device__ __constant__ int2 globalOffsetsGridIdcsReg[4];
 #define LENGTH2(X) (sqrtf(X.x*X.x + X.y*X.y))
 #define DIST2(X, Y) (sqrtf((X.x-Y.x)*(X.x-Y.x) + (X.y-Y.y)*(X.y-Y.y)))
 
-__device__ vec3<float> MapThinLens(const float fFLength, const vec3<float>& vPosIn)
+__device__ vec3<float> MapThinLens(const float fFLength, const vec3<float>&vPosIn)
 {
     // Lens mapping scale given by absolute thin lens equation and switch of sign in 3rd
     // component for direction change.
@@ -58,11 +58,10 @@ __device__ vec3<float> MapThinLens(const float fFLength, const vec3<float>& vPos
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-template<const int t_intChannels>
+template<const int t_intChannels, const EGridType t_eGridType>
 __global__ void computeUnproject(float* outputPoints3D, float* outputPointColors,
         float* outputDepthmap, float* outputSynthImage,
-        cudaTextureObject_t texInputDisparities,
-        cudaTextureObject_t texInputPlenopticImage)
+        cudaTextureObject_t texInputDisparities, cudaTextureObject_t texInputPlenopticImage)
 {
     // Get pixel position and test 'in image'
     vec2<float> vPixelPos_px;
@@ -83,12 +82,12 @@ __global__ void computeUnproject(float* outputPoints3D, float* outputPointColors
     // Get index of source lens in grid
     vec2<float> vGridIndex;
     // comming from plenoptic image implies using mirco-image grid
-    vGridIndex = globalParams.descrMla.PixelToLensImageGrid(vPixelPos_px);
+    vGridIndex = globalParams.descrMla.PixelToLensImageGrid<t_eGridType>(vPixelPos_px);
     // round to integral lens index
-    vGridIndex = globalParams.descrMla.GridRound(vGridIndex);
+    vGridIndex = globalParams.descrMla.GridRound<t_eGridType>(vGridIndex);
 
     // get pinhole properties of micro camera relative to main lens
-    PIP::MTCamProjection<float> projMicroLens = globalParams.descrMla.GetMicrocamProjection(vGridIndex);
+    PIP::MTCamProjection<float> projMicroLens = globalParams.descrMla.GetMicrocamProjection<t_eGridType>(vGridIndex);
     // 3-space position relative to main lens in mm
     vec3<float> vPos3D = projMicroLens.Unproject(vPixelPos_px,
                                                  globalParams.descrMla.fMicroLensPrincipalDist_px * globalParams.descrMla.fPixelsize_mm / fDisparity_baselines);
@@ -217,7 +216,7 @@ __device__ float4 getRGBAcolor(const vec2<float>& vPx, cudaTextureObject_t texIn
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-template<typename OUTPUTSTORAGETYPE, const int t_intChannels>
+template<typename OUTPUTSTORAGETYPE, const int t_intChannels, const EGridType t_eGridType>
 __global__ void computeImageSynthesis(OUTPUTSTORAGETYPE* outputSynthImage,
         cudaTextureObject_t                              texInputDepth2D,
         cudaTextureObject_t                              texInputPlenopticImage,
@@ -255,13 +254,13 @@ __global__ void computeImageSynthesis(OUTPUTSTORAGETYPE* outputSynthImage,
     vPos2D_px.y += globalParams.descrMla.vfMainPrincipalPoint_px.y;
     // -> get closest lens index
     //vec2<float> vMLensIndex = globalParams.descrMla.GridRound(globalParams.descrMla.PixelToLensCenterGrid(vPos2D_px));
-    vec2<float> vMLensIndex = globalParams.descrMla.GridRound(globalParams.descrMla.PixelToLensImageGrid(vPos2D_px));
+    vec2<float> vMLensIndex = globalParams.descrMla.GridRound<t_eGridType>(globalParams.descrMla.PixelToLensImageGrid<t_eGridType>(vPos2D_px));
 
     // Project virtual position to raw image using micro lens projection
     vec2<float> vRawLfPix_px;
-    vRawLfPix_px = globalParams.descrMla.GetMicrocamProjection(vMLensIndex).Project(vVirtualPos3D_MM);
+    vRawLfPix_px = globalParams.descrMla.GetMicrocamProjection<t_eGridType>(vMLensIndex).Project(vVirtualPos3D_MM);
     // If pixel is too far from lens center, skip
-    if ((vRawLfPix_px - globalParams.descrMla.GetMicroImageCenter_px(vMLensIndex)).length()
+    if ((vRawLfPix_px - globalParams.descrMla.GetMicroImageCenter_px<t_eGridType>(vMLensIndex)).length()
         > 0.475f*globalParams.descrMla.fMicroLensDistance_px)
     {
         return;
@@ -292,9 +291,9 @@ __global__ void computeImageSynthesis(OUTPUTSTORAGETYPE* outputSynthImage,
         vfTargetLensIndex.x = vMLensIndex.x + globalOffsetsGridIdcsHex[i].x;
         vfTargetLensIndex.y = vMLensIndex.y + globalOffsetsGridIdcsHex[i].y;
         // Get projection to micro image
-        vRawLfPix_px = globalParams.descrMla.GetMicrocamProjection(vfTargetLensIndex).Project(vVirtualPos3D_MM);
+        vRawLfPix_px = globalParams.descrMla.GetMicrocamProjection<t_eGridType>(vfTargetLensIndex).Project(vVirtualPos3D_MM);
         // Reject pixel if out-of-lens border
-        if ((vRawLfPix_px - globalParams.descrMla.GetMicroImageCenter_px(vfTargetLensIndex)).length() > 0.475f*globalParams.descrMla.fMicroLensDistance_px)
+        if ((vRawLfPix_px - globalParams.descrMla.GetMicroImageCenter_px<t_eGridType>(vfTargetLensIndex)).length() > 0.475f*globalParams.descrMla.fMicroLensDistance_px)
         {
             continue;
         }
@@ -397,7 +396,7 @@ __global__ void computeMedianFill(float* outputFilledMap,
 void CCUDAMicrolensFusion::Unproject(CVImage_sptr& spPoints3D, CVImage_sptr& spPointsColors,
         CVImage_sptr& spDepthmap, CVImage_sptr& spSynthImage,
         const CVImage_sptr& spDisparties, const CVImage_sptr& spPlenopticImage,
-        const SPlenCamDescription<true>& descrMLA, const PIP::MTCamProjection<float> projTarget,
+        const SPlenCamDescription& descrMLA, const PIP::MTCamProjection<float> projTarget,
         const float fMinNormedDisp, const float fMaxNormedDisp)
 {
     // Ensure MONO+ALPHA or COLOR+ALPHA input image and single channel float disparities
@@ -417,7 +416,7 @@ void CCUDAMicrolensFusion::Unproject(CVImage_sptr& spPoints3D, CVImage_sptr& spP
     if (spPoints3D == nullptr)
     {
         spPoints3D = CVImage_sptr(new CVImage(spPlenopticImage->cols(), spPlenopticImage->rows(),
-                                                      CV_32FC4, EImageType::Points3D));
+                                              CV_32FC4, EImageType::Points3D));
     }
     else
     {
@@ -431,14 +430,14 @@ void CCUDAMicrolensFusion::Unproject(CVImage_sptr& spPoints3D, CVImage_sptr& spP
     if ((e = cudaGetLastError()) != 0)
     {
         throw CRuntimeException(std::string("CCUDAMicrolensFusion::Unproject : CUDA arrOutPoints3D memset : \"")
-                                  + std::string(cudaGetErrorString(e)));
+                + std::string(cudaGetErrorString(e)));
     }
 
     // Allocate destination image for 3D points colors
     if (spPointsColors == nullptr)
     {
         spPointsColors = CVImage_sptr(new CVImage(spPlenopticImage->cols(), spPlenopticImage->rows(),
-                                                          CV_32FC4, EImageType::RGBA));
+                                                  CV_32FC4, EImageType::RGBA));
     }
     else
     {
@@ -451,14 +450,14 @@ void CCUDAMicrolensFusion::Unproject(CVImage_sptr& spPoints3D, CVImage_sptr& spP
     if ((e = cudaGetLastError()) != 0)
     {
         throw CRuntimeException(std::string("CCUDAMicrolensFusion::Unproject : CUDA arrOutPointsColors memset : \"")
-                                  + std::string(cudaGetErrorString(e)));
+                + std::string(cudaGetErrorString(e)));
     }
 
     // Allocate depthmap and TF
     if (spDepthmap == nullptr)
     {
         spDepthmap = CVImage_sptr(new CVImage(projTarget.vecRes.x, projTarget.vecRes.y,
-                                                      CV_32FC1, EImageType::GRAYDEPTH));
+                                              CV_32FC1, EImageType::GRAYDEPTH));
     }
     else
     {
@@ -470,13 +469,13 @@ void CCUDAMicrolensFusion::Unproject(CVImage_sptr& spPoints3D, CVImage_sptr& spP
     if ((e = cudaGetLastError()) != 0)
     {
         throw CRuntimeException(std::string("CCUDAMicrolensFusion::Unproject : CUDA arrOutDepthmap memset : \"")
-                                  + std::string(cudaGetErrorString(e)));
+                + std::string(cudaGetErrorString(e)));
     }
     // Allocate depthmap and TF
     if (spSynthImage == nullptr)
     {
         spSynthImage = CVImage_sptr(new CVImage(projTarget.vecRes.x, projTarget.vecRes.y,
-                                                        CV_32FC4, EImageType::RGBA));
+                                                CV_32FC4, EImageType::RGBA));
     }
     else
     {
@@ -488,7 +487,7 @@ void CCUDAMicrolensFusion::Unproject(CVImage_sptr& spPoints3D, CVImage_sptr& spP
     if ((e = cudaGetLastError()) != 0)
     {
         throw CRuntimeException(std::string("CCUDAMicrolensFusion::Unproject : CUDA arrOutTotalFocus memset : \"")
-                                  + std::string(cudaGetErrorString(e)));
+                + std::string(cudaGetErrorString(e)));
     }
 
     // Create CUDA parameter struct and upload to symbol
@@ -517,23 +516,41 @@ void CCUDAMicrolensFusion::Unproject(CVImage_sptr& spPoints3D, CVImage_sptr& spP
     dim3 threadsPerBlock = dim3(32, 32);
     dim3 blocks = dim3(spPlenopticImage->cols() / 32 + 1, spPlenopticImage->rows() / 32 + 1);
     // Call kernel with appropriate channel count
-    if (spPlenopticImage->CvMat().channels() == 2)
+    if ((spPlenopticImage->CvMat().channels() == 2)&&(descrMLA.eGridType == EGridType::HEXAGONAL))
     {
-        computeUnproject<2><<<blocks, threadsPerBlock>>>(arrOutPoints3D.GetDevicePointer(),
-                                                         arrOutPointsColors.GetDevicePointer(),
-                                                         arrOutDepthmap.GetDevicePointer(),
-                                                         arrOutSynthImage.GetDevicePointer(),
-                                                         texInputDisparities.GetTextureObject(),
-                                                         texInputImage.GetTextureObject());
+        computeUnproject<2, EGridType::HEXAGONAL><<<blocks, threadsPerBlock>>>(arrOutPoints3D.GetDevicePointer(),
+                                                                               arrOutPointsColors.GetDevicePointer(),
+                                                                               arrOutDepthmap.GetDevicePointer(),
+                                                                               arrOutSynthImage.GetDevicePointer(),
+                                                                               texInputDisparities.GetTextureObject(),
+                                                                               texInputImage.GetTextureObject());
     }
-    else
+    else if ((spPlenopticImage->CvMat().channels() == 2)&&(descrMLA.eGridType == EGridType::RECTANGULAR))
     {
-        computeUnproject<4><<<blocks, threadsPerBlock>>>(arrOutPoints3D.GetDevicePointer(),
-                                                         arrOutPointsColors.GetDevicePointer(),
-                                                         arrOutDepthmap.GetDevicePointer(),
-                                                         arrOutSynthImage.GetDevicePointer(),
-                                                         texInputDisparities.GetTextureObject(),
-                                                         texInputImage.GetTextureObject());
+        computeUnproject<2, EGridType::RECTANGULAR><<<blocks, threadsPerBlock>>>(arrOutPoints3D.GetDevicePointer(),
+                                                                                 arrOutPointsColors.GetDevicePointer(),
+                                                                                 arrOutDepthmap.GetDevicePointer(),
+                                                                                 arrOutSynthImage.GetDevicePointer(),
+                                                                                 texInputDisparities.GetTextureObject(),
+                                                                                 texInputImage.GetTextureObject());
+    }
+    else if (descrMLA.eGridType == EGridType::HEXAGONAL)
+    {
+        computeUnproject<4, EGridType::HEXAGONAL><<<blocks, threadsPerBlock>>>(arrOutPoints3D.GetDevicePointer(),
+                                                                               arrOutPointsColors.GetDevicePointer(),
+                                                                               arrOutDepthmap.GetDevicePointer(),
+                                                                               arrOutSynthImage.GetDevicePointer(),
+                                                                               texInputDisparities.GetTextureObject(),
+                                                                               texInputImage.GetTextureObject());
+    }
+    else if (descrMLA.eGridType == EGridType::RECTANGULAR)
+    {
+        computeUnproject<4, EGridType::RECTANGULAR><<<blocks, threadsPerBlock>>>(arrOutPoints3D.GetDevicePointer(),
+                                                                                 arrOutPointsColors.GetDevicePointer(),
+                                                                                 arrOutDepthmap.GetDevicePointer(),
+                                                                                 arrOutSynthImage.GetDevicePointer(),
+                                                                                 texInputDisparities.GetTextureObject(),
+                                                                                 texInputImage.GetTextureObject());
     }
 
     // Wait for kernels to finish and check for errors
@@ -572,7 +589,7 @@ void CCUDAMicrolensFusion::Unproject(CVImage_sptr& spPoints3D, CVImage_sptr& spP
 template<typename OUTPUTSTORAGETYPE>
 void CCUDAMicrolensFusion::ImageSynthesis(CVImage_sptr &spSynthImage, const CVImage_sptr& spDepth2D,
         const CVImage_sptr& spPlenopticImage,
-        const SPlenCamDescription<true>& descrMLA, const PIP::MTCamProjection<float> projTarget)
+        const SPlenCamDescription& descrMLA, const PIP::MTCamProjection<float> projTarget)
 {
     // Ensure MONO+ALPHA or COLOR+ALPHA input image and single channel float disparities
     if (((spPlenopticImage->CvMat().channels() != 1) && (spPlenopticImage->CvMat().channels() != 2)&&(spPlenopticImage->CvMat().channels() != 4))
@@ -591,7 +608,7 @@ void CCUDAMicrolensFusion::ImageSynthesis(CVImage_sptr &spSynthImage, const CVIm
     if (spSynthImage == nullptr)
     {
         spSynthImage = CVImage_sptr(new CVImage(projTarget.vecRes.x, projTarget.vecRes.y,
-                                                        CVImage::GetCvTypeFromTypename<OUTPUTSTORAGETYPE, 4>(), EImageType::RGBA));
+                                                CVImage::GetCvTypeFromTypename<OUTPUTSTORAGETYPE, 4>(), EImageType::RGBA));
     }
     else
     {
@@ -641,24 +658,44 @@ void CCUDAMicrolensFusion::ImageSynthesis(CVImage_sptr &spSynthImage, const CVIm
 
     if (spPlenopticImage->CvMat().channels() == 1)
     {
-        computeImageSynthesis<OUTPUTSTORAGETYPE, 1><<<blocks, threadsPerBlock>>>(cudaImgArrSynthImage.GetDevicePointer(),
-                                                                                 texInputDepth.GetTextureObject(),
-                                                                                 texInputImage.GetTextureObject(),
-                                                                                 fOutputTypeScale);
+        if (descrMLA.eGridType == EGridType::HEXAGONAL)
+            computeImageSynthesis<OUTPUTSTORAGETYPE, 1, EGridType::HEXAGONAL><<<blocks, threadsPerBlock>>>(cudaImgArrSynthImage.GetDevicePointer(),
+                                                                                                           texInputDepth.GetTextureObject(),
+                                                                                                           texInputImage.GetTextureObject(),
+                                                                                                           fOutputTypeScale);
+        else
+            computeImageSynthesis<OUTPUTSTORAGETYPE, 1, EGridType::RECTANGULAR><<<blocks, threadsPerBlock>>>(cudaImgArrSynthImage.GetDevicePointer(),
+                                                                                                             texInputDepth.GetTextureObject(),
+                                                                                                             texInputImage.GetTextureObject(),
+                                                                                                             fOutputTypeScale);
+
     }
     else if (spPlenopticImage->CvMat().channels() == 2)
     {
-        computeImageSynthesis<OUTPUTSTORAGETYPE, 2><<<blocks, threadsPerBlock>>>(cudaImgArrSynthImage.GetDevicePointer(),
-                                                                                 texInputDepth.GetTextureObject(),
-                                                                                 texInputImage.GetTextureObject(),
-                                                                                 fOutputTypeScale);
+        if (descrMLA.eGridType == EGridType::HEXAGONAL)
+            computeImageSynthesis<OUTPUTSTORAGETYPE, 2, EGridType::HEXAGONAL><<<blocks, threadsPerBlock>>>(cudaImgArrSynthImage.GetDevicePointer(),
+                                                                                                           texInputDepth.GetTextureObject(),
+                                                                                                           texInputImage.GetTextureObject(),
+                                                                                                           fOutputTypeScale);
+        else
+            computeImageSynthesis<OUTPUTSTORAGETYPE, 2, EGridType::RECTANGULAR><<<blocks, threadsPerBlock>>>(cudaImgArrSynthImage.GetDevicePointer(),
+                                                                                                             texInputDepth.GetTextureObject(),
+                                                                                                             texInputImage.GetTextureObject(),
+                                                                                                             fOutputTypeScale);
     }
     else if (spPlenopticImage->CvMat().channels() == 4)
     {
-        computeImageSynthesis<OUTPUTSTORAGETYPE, 4><<<blocks, threadsPerBlock>>>(cudaImgArrSynthImage.GetDevicePointer(),
-                                                                                 texInputDepth.GetTextureObject(),
-                                                                                 texInputImage.GetTextureObject(),
-                                                                                 fOutputTypeScale);
+        if (descrMLA.eGridType == EGridType::HEXAGONAL)
+            computeImageSynthesis<OUTPUTSTORAGETYPE, 4, EGridType::HEXAGONAL><<<blocks, threadsPerBlock>>>(cudaImgArrSynthImage.GetDevicePointer(),
+                                                                                                           texInputDepth.GetTextureObject(),
+                                                                                                           texInputImage.GetTextureObject(),
+                                                                                                           fOutputTypeScale);
+        else
+            computeImageSynthesis<OUTPUTSTORAGETYPE, 4, EGridType::RECTANGULAR><<<blocks, threadsPerBlock>>>(cudaImgArrSynthImage.GetDevicePointer(),
+                                                                                                             texInputDepth.GetTextureObject(),
+                                                                                                             texInputImage.GetTextureObject(),
+                                                                                                             fOutputTypeScale);
+
     }
 
     // Wait for kernels to finish and check for errors
@@ -749,12 +786,12 @@ template void PIP::CCUDAMicrolensFusion::MedianFill<4>(CVImage_sptr& spDepth2D, 
 template void PIP::CCUDAMicrolensFusion::MedianFill<5>(CVImage_sptr& spDepth2D, const bool flagSmoothing);
 
 
-template void PIP::CCUDAMicrolensFusion::ImageSynthesis<unsigned char>(CVImage_sptr &spSynthImage, const CVImage_sptr& spDepth2D,
-        const CVImage_sptr& spPlenopticImage,
-        const SPlenCamDescription<true>& descrMLA, const PIP::MTCamProjection<float> projTarget);
-template void PIP::CCUDAMicrolensFusion::ImageSynthesis<unsigned short>(CVImage_sptr &spSynthImage, const CVImage_sptr& spDepth2D,
-        const CVImage_sptr& spPlenopticImage,
-        const SPlenCamDescription<true>& descrMLA, const PIP::MTCamProjection<float> projTarget);
-template void PIP::CCUDAMicrolensFusion::ImageSynthesis<float>(CVImage_sptr &spSynthImage, const CVImage_sptr& spDepth2D,
-        const CVImage_sptr& spPlenopticImage,
-        const SPlenCamDescription<true>& descrMLA, const PIP::MTCamProjection<float> projTarget);
+template void PIP::CCUDAMicrolensFusion::ImageSynthesis<unsigned char>(CVImage_sptr &spSynthImage, const CVImage_sptr &spDepth2D,
+                                                                       const CVImage_sptr &spPlenopticImage,
+                                                                       const SPlenCamDescription &descrMLA, const PIP::MTCamProjection<float> projTarget);
+template void PIP::CCUDAMicrolensFusion::ImageSynthesis<unsigned short>(CVImage_sptr &spSynthImage, const CVImage_sptr &spDepth2D,
+                                                                        const CVImage_sptr &spPlenopticImage,
+                                                                        const SPlenCamDescription &descrMLA, const PIP::MTCamProjection<float> projTarget);
+template void PIP::CCUDAMicrolensFusion::ImageSynthesis<float>(CVImage_sptr &spSynthImage, const CVImage_sptr &spDepth2D,
+                                                               const CVImage_sptr &spPlenopticImage,
+                                                               const SPlenCamDescription &descrMLA, const PIP::MTCamProjection<float> projTarget);

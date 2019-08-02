@@ -34,7 +34,7 @@ namespace  PIP
 struct SParamsDisparityEstimation_basic
 {
     // Description for MLA (radius etc.)
-    SPlenCamDescription<true> descrMla;
+    SPlenCamDescription descrMla;
     // Normalized disparity to start estimation
     float fMinDisparity = 0;
     // Normalized disparity to stop estimation
@@ -48,7 +48,7 @@ struct SParamsDisparityEstimation_basic
 ///        disparity estimation using simple blockmatching to direct neighbor lenses. Pixel cost
 ///        is defined as sum of costs of all neighbor lenses matching
 ///
-class CCUDADisparityEstimation_basic final : public IDisparityEstimation<SParamsDisparityEstimation_basic>
+class CCUDADisparityEstimation_basic final : public IDisparityEstimation
 {
 public:
     CCUDADisparityEstimation_basic() {}

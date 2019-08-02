@@ -1,9 +1,9 @@
 /**
  * Copyright 2019 Arne Petersen, Kiel University
  *
- *    Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
+ *    Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
  *    associated documentation files (the "Software"), to deal in the Software without restriction, including
- *    without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or 
+ *    without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
  *    sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject
  *    to the following conditions:
  *
@@ -62,22 +62,24 @@ void kernel_VignettingNormalization(float* pNormalizedImage,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-template<const int t_intChannelCount>
+template<const int t_intChannelCount, const PIP::EGridType t_eGridType>
 __global__
 void kernel_Histogramm(uint* pHistogramm, float* pNormalizedImage,
         const int intWidth, const int intHeight,
-        const PIP::SPlenCamDescription<true> descMLA)
+        const PIP::SPlenCamDescription descMLA)
 {
     const int idxX = blockIdx.x * blockDim.x + threadIdx.x;
     const int idxY = blockIdx.y * blockDim.y + threadIdx.y;
 
     if ((idxX > intWidth-1)||(idxY > intHeight-1)) { return; }
 
-    // Reject pixels out of valid micro-lens area
+    // Reject pixels out of valid micro-lens area...
     PIP::vec2<float> vActivePixel;
     vActivePixel.Set(float(idxX), float(idxY));
-    // Get pixel in float-coordinates in micro image grid, round to integral lens index and get respective micro-image center
-    const float distToLensCenter_px = (descMLA.GetMicroImageCenter_px(descMLA.GridRound(descMLA.PixelToLensImageGrid(vActivePixel))) - vActivePixel).length();
+    // ...get pixel in float-coordinates in micro image grid, round to integral lens index and get respective micro-image center
+    const float distToLensCenter_px =
+        (descMLA.GetMicroImageCenter_px<t_eGridType>(descMLA.GridRound<t_eGridType>(descMLA.PixelToLensImageGrid<t_eGridType>(vActivePixel)))
+         - vActivePixel).length();
     if (distToLensCenter_px > descMLA.GetMicroImageRadius_px()) return;
 
     uint idxBin = 0;
@@ -141,7 +143,7 @@ void kernel_Rescale(OUTPUTTYPE* pNormalizedImageConverted, float* pNormalizedIma
         pNormalizedImageConverted[idxY*intWidth*4 + idxX*4 + 2]
             = (OUTPUTTYPE) (CLAMP(fScale * pNormalizedImageFloat[idxY*intWidth*4 + idxX*4 + 2], 0.0f, fOUTPUTTYPEMaxValue));
         pNormalizedImageConverted[idxY*intWidth*4 + idxX*4 + 3]
-            //= (OUTPUTTYPE) fOUTPUTTYPEMaxValue;
+        //= (OUTPUTTYPE) fOUTPUTTYPEMaxValue;
             = (OUTPUTTYPE) (CLAMP(fOUTPUTTYPEMaxValue * pNormalizedImageFloat[idxY*intWidth*4 + idxX*4 + 3], 0.0f, fOUTPUTTYPEMaxValue));
 
     }
@@ -150,10 +152,10 @@ void kernel_Rescale(OUTPUTTYPE* pNormalizedImageConverted, float* pNormalizedIma
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 template<typename OUTPUTTYPE>
 void PIP::CVignettingNormalization_CUDA::_NormalizeImage(PIP::CVImage_sptr& spNormalizedImage,
-        const PIP::CVImage_sptr& spRawImage,
-        const PIP::CVImage_sptr& spVignettingImage,
-        const float fHistScaleFraction,
-        const SPlenCamDescription<true> &descrMLA)
+        const PIP::CVImage_sptr&                                            spRawImage,
+        const PIP::CVImage_sptr&                                            spVignettingImage,
+        const float                                                         fHistScaleFraction,
+        const SPlenCamDescription &                                         descrMLA)
 {
     const int width =  spRawImage->cols();
     const int height = spRawImage->rows();
@@ -273,19 +275,43 @@ void PIP::CVignettingNormalization_CUDA::_NormalizeImage(PIP::CVImage_sptr& spNo
         switch (spRawImage->CvMat().channels())
         {
           case 1:
-              kernel_Histogramm<1><<<threadDims, blockDims>>>(cudaArrHistogram.GetDevicePointer(), cudaImageArray_Normalized.GetDevicePointer(),
-                                                              width, height, descrMLA);
+          {
+              if (descrMLA.eGridType == EGridType::HEXAGONAL)
+                  kernel_Histogramm<1, EGridType::HEXAGONAL><<<threadDims, blockDims>>>(cudaArrHistogram.GetDevicePointer(),
+                                                                                        cudaImageArray_Normalized.GetDevicePointer(),
+                                                                                        width, height, descrMLA);
+              else
+                  kernel_Histogramm<1, EGridType::RECTANGULAR><<<threadDims, blockDims>>>(cudaArrHistogram.GetDevicePointer(),
+                                                                                          cudaImageArray_Normalized.GetDevicePointer(),
+                                                                                          width, height, descrMLA);
               break;
+          }
 
           case 2:
-              kernel_Histogramm<2><<<threadDims, blockDims>>>(cudaArrHistogram.GetDevicePointer(), cudaImageArray_Normalized.GetDevicePointer(),
-                                                              width, height, descrMLA);
+          {
+              if (descrMLA.eGridType == EGridType::HEXAGONAL)
+                  kernel_Histogramm<2, EGridType::HEXAGONAL><<<threadDims, blockDims>>>(cudaArrHistogram.GetDevicePointer(),
+                                                                                        cudaImageArray_Normalized.GetDevicePointer(),
+                                                                                        width, height, descrMLA);
+              else
+                  kernel_Histogramm<2, EGridType::RECTANGULAR><<<threadDims, blockDims>>>(cudaArrHistogram.GetDevicePointer(),
+                                                                                          cudaImageArray_Normalized.GetDevicePointer(),
+                                                                                          width, height, descrMLA);
               break;
+          }
 
           case 4:
-              kernel_Histogramm<4><<<threadDims, blockDims>>>(cudaArrHistogram.GetDevicePointer(), cudaImageArray_Normalized.GetDevicePointer(),
-                                                              width, height, descrMLA);
+          {
+              if (descrMLA.eGridType == EGridType::HEXAGONAL)
+                  kernel_Histogramm<4, EGridType::HEXAGONAL><<<threadDims, blockDims>>>(cudaArrHistogram.GetDevicePointer(),
+                                                                                        cudaImageArray_Normalized.GetDevicePointer(),
+                                                                                        width, height, descrMLA);
+              else
+                  kernel_Histogramm<4, EGridType::RECTANGULAR><<<threadDims, blockDims>>>(cudaArrHistogram.GetDevicePointer(),
+                                                                                          cudaImageArray_Normalized.GetDevicePointer(),
+                                                                                          width, height, descrMLA);
               break;
+          }
 
           default:
               break; // illegal channel count catched before
@@ -361,11 +387,11 @@ void PIP::CVignettingNormalization_CUDA::_NormalizeImage(PIP::CVImage_sptr& spNo
 
 
 template void PIP::CVignettingNormalization_CUDA::_NormalizeImage<unsigned char>(PIP::CVImage_sptr& spNormalizedImage,
-                                                                                const PIP::CVImage_sptr& spRawImage, const PIP::CVImage_sptr& spVignettingImage, const float fNormalizationScale,
-                                                                                const SPlenCamDescription<true> &descrMLA);
-template void PIP::CVignettingNormalization_CUDA::_NormalizeImage<unsigned short>(PIP::CVImage_sptr& spNormalizedImage,
                                                                                  const PIP::CVImage_sptr& spRawImage, const PIP::CVImage_sptr& spVignettingImage, const float fNormalizationScale,
-                                                                                 const SPlenCamDescription<true> &descrMLA);
+                                                                                 const SPlenCamDescription &descrMLA);
+template void PIP::CVignettingNormalization_CUDA::_NormalizeImage<unsigned short>(PIP::CVImage_sptr& spNormalizedImage,
+                                                                                  const PIP::CVImage_sptr& spRawImage, const PIP::CVImage_sptr& spVignettingImage, const float fNormalizationScale,
+                                                                                  const SPlenCamDescription &descrMLA);
 template void PIP::CVignettingNormalization_CUDA::_NormalizeImage<float>(PIP::CVImage_sptr& spNormalizedImage,
-                                                                        const PIP::CVImage_sptr& spRawImage, const PIP::CVImage_sptr& spVignettingImage, const float fNormalizationScale,
-                                                                        const SPlenCamDescription<true> &descrMLA);
+                                                                         const PIP::CVImage_sptr& spRawImage, const PIP::CVImage_sptr& spVignettingImage, const float fNormalizationScale,
+                                                                         const SPlenCamDescription &descrMLA);

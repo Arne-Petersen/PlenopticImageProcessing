@@ -81,9 +81,9 @@ QtPlenopticTools::MainWindow::MainWindow(QWidget *parent) :
     vPrincPoint.x -= (vPrincPoint.x-1.0f)/2.0f;
     vPrincPoint.y -= (vPrincPoint.y-1.0f)/2.0f;
     // Assume same sensor size in mm for target and MLA camera
-    const float fTargPxSize_mm = float(m_descrHexMLA.viSensorRes_px.x)/float(projTarget.vecRes.x) * m_descrHexMLA.fPixelsize_mm;
-    projTarget.SetCameraParameters(m_descrHexMLA.fMainLensFLength_mm/fTargPxSize_mm,
-                                   m_descrHexMLA.fMainLensFLength_mm/fTargPxSize_mm,
+    const float fTargPxSize_mm = float(m_descrMLA.viSensorRes_px.x)/float(projTarget.vecRes.x) * m_descrMLA.fPixelsize_mm;
+    projTarget.SetCameraParameters(m_descrMLA.fMainLensFLength_mm/fTargPxSize_mm,
+                                   m_descrMLA.fMainLensFLength_mm/fTargPxSize_mm,
                                    0, vPrincPoint);
 
     // Create extra scrollable window for slider list
@@ -122,31 +122,31 @@ QtPlenopticTools::MainWindow::MainWindow(QWidget *parent) :
     m_pSliderWidget->AddSlider(PT_SLIDER_ESTIMATOR_MINDISP, "minimum depth in normalized disparities to view (less will be blue)", CCUDADisparityEstimation_OFL_DNORMALIZED_MIN, 0.0, 1.0, 100);
     m_pSliderWidget->AddSlider(PT_SLIDER_ESTIMATOR_MAXDISP, "maximum depth in normalized disparities to view (more is yellow)", CCUDADisparityEstimation_OFL_DNORMALIZED_MAX, 0.0, 1.0, 100);
     // ... parameters controling MLA and main lens
-    m_descrHexMLA.Reset();
-    m_descrHexMLA.fMicroImageDiam_MLDistFrac = 0.95f; // omit outer 5percent of micro images as default
+    m_descrMLA.Reset();
+    m_descrMLA.fMicroImageDiam_MLDistFrac = 0.95f; // omit outer 5percent of micro images as default
     m_pSliderWidget->AddGroupLabel(":2group", "MLA settings", "description of MLA properties.");
     m_pSliderWidget->AddSlider(PT_SLIDER_MLA_GRIDROT, "Rotation of MLA in [rad] with respect to images x-axis.",
-                              m_descrHexMLA.fGridRot_rad, -MF_PI/20.0, MF_PI/20.0, 10000);
+                              m_descrMLA.fGridRot_rad, -MF_PI/20.0, MF_PI/20.0, 10000);
     m_pSliderWidget->AddSlider(PT_SLIDER_MLA_MLENSDIST, "Distance between two micro lenses in [px]",
-                              m_descrHexMLA.fMicroLensDistance_px, 0, 100, 20000);
+                              m_descrMLA.fMicroLensDistance_px, 0, 100, 20000);
     m_pSliderWidget->AddSlider(PT_SLIDER_MLA_MLIMAGESCALE, "Scale between micro lens grid and micro image grid",
-                              m_descrHexMLA.fMlaImageScale, 0.5, 2, 10000);
+                              m_descrMLA.fMlaImageScale, 0.5, 2, 10000);
     m_pSliderWidget->AddSlider(PT_SLIDER_MLA_SENSORDIST, "Distance between MLA and sensor at main lens' principal point [mm]",
-                              m_descrHexMLA.fMicroLensPrincipalDist_px* m_descrHexMLA.fPixelsize_mm, 0.0, 5.0, 1000.0);
+                              m_descrMLA.fMicroLensPrincipalDist_px* m_descrMLA.fPixelsize_mm, 0.0, 5.0, 1000.0);
     m_pSliderWidget->AddSlider(PT_SLIDER_MLA_MAINFLEN, "Focal length of main lens [mm]",
-                              m_descrHexMLA.fMainLensFLength_mm, 0.0, 1000.0, 1000);
+                              m_descrMLA.fMainLensFLength_mm, 0.0, 1000.0, 1000);
     m_pSliderWidget->AddSlider(PT_SLIDER_MLA_MLAMAINLENSDIST, "Distance between main lens projection center and MLA [mm]",
-                              m_descrHexMLA.mtMlaPose_L_MLA.t_rl_l.z, 0.0, 1000.0, 1000);
+                              m_descrMLA.mtMlaPose_L_MLA.t_rl_l.z, 0.0, 1000.0, 1000);
     m_pSliderWidget->AddSlider(PT_SLIDER_MLA_PXSIZE, "Size of sensor pixels in [mm]",
-                              m_descrHexMLA.fPixelsize_mm, 0.0, 0.1, 10000);
+                              m_descrMLA.fPixelsize_mm, 0.0, 0.1, 10000);
     m_pSliderWidget->AddSlider(PT_SLIDER_MLA_MAINPRINCPOINTX, "Intersection of main lens optical axis in x-axis and sensor width in sensor fractions.",
                               0.5, 0, 1, 1000);
     m_pSliderWidget->AddSlider(PT_SLIDER_MLA_MAINPRINCPOINTY, "Intersection of main lens optical axis in x-axis and sensor width in sensor fractions.",
                               0.5, 0, 1, 1000);
     m_pSliderWidget->AddSlider(PT_SLIDER_MLA_SHIFTX, "Shift in X-axis of MLA center to sensor center in px.",
-                              m_descrHexMLA.vMlaCenter_px.x, -100, 100, 10000);
+                              m_descrMLA.vMlaCenter_px.x, -100, 100, 10000);
     m_pSliderWidget->AddSlider(PT_SLIDER_MLA_SHIFTY, "Y-axis center of MLA in sensor fractions.",
-                              m_descrHexMLA.vMlaCenter_px.y, -100, 100, 10000);
+                              m_descrMLA.vMlaCenter_px.y, -100, 100, 10000);
 
     // Display slider window and put it on top of gui
     m_pWinSliders->show();
@@ -201,17 +201,17 @@ void QtPlenopticTools::MainWindow::_UpdateGUI()
     try
     {
         // Set slider for MLA from member (quitely, last param true, to avoid unwanted callbacks)
-        m_pSliderWidget->SetValue(PT_SLIDER_MLA_MAINFLEN, m_descrHexMLA.fMainLensFLength_mm, true);
-        m_pSliderWidget->SetValue(PT_SLIDER_MLA_MLAMAINLENSDIST, m_descrHexMLA.mtMlaPose_L_MLA.t_rl_l.z, true);
-        m_pSliderWidget->SetValue(PT_SLIDER_MLA_MLIMAGESCALE, m_descrRegularMLA.fMlaImageScale, true);
-        m_pSliderWidget->SetValue(PT_SLIDER_MLA_PXSIZE, m_descrHexMLA.fPixelsize_mm, true);
-        m_pSliderWidget->SetValue(PT_SLIDER_MLA_GRIDROT, m_descrHexMLA.fGridRot_rad, true);
-        m_pSliderWidget->SetValue(PT_SLIDER_MLA_MLENSDIST, m_descrHexMLA.GetfMicroImageDistance_px(), true);
-        m_pSliderWidget->SetValue(PT_SLIDER_MLA_SENSORDIST, m_descrHexMLA.fMicroLensPrincipalDist_px*m_descrHexMLA.fPixelsize_mm, true);
-        m_pSliderWidget->SetValue(PT_SLIDER_MLA_MAINPRINCPOINTX, float(m_descrHexMLA.vfMainPrincipalPoint_px.x) / float(m_descrHexMLA.viSensorRes_px.x), true);
-        m_pSliderWidget->SetValue(PT_SLIDER_MLA_MAINPRINCPOINTY, float(m_descrHexMLA.vfMainPrincipalPoint_px.y) / float(m_descrHexMLA.viSensorRes_px.y), true);
-        m_pSliderWidget->SetValue(PT_SLIDER_MLA_SHIFTX, m_descrHexMLA.vMlaCenter_px.x - 0.5f*float(m_descrHexMLA.viSensorRes_px.x-1), true);
-        m_pSliderWidget->SetValue(PT_SLIDER_MLA_SHIFTY, m_descrHexMLA.vMlaCenter_px.y - 0.5f*float(m_descrHexMLA.viSensorRes_px.y-1), true);
+        m_pSliderWidget->SetValue(PT_SLIDER_MLA_MAINFLEN, m_descrMLA.fMainLensFLength_mm, true);
+        m_pSliderWidget->SetValue(PT_SLIDER_MLA_MLAMAINLENSDIST, m_descrMLA.mtMlaPose_L_MLA.t_rl_l.z, true);
+        m_pSliderWidget->SetValue(PT_SLIDER_MLA_MLIMAGESCALE, m_descrMLA.fMlaImageScale, true);
+        m_pSliderWidget->SetValue(PT_SLIDER_MLA_PXSIZE, m_descrMLA.fPixelsize_mm, true);
+        m_pSliderWidget->SetValue(PT_SLIDER_MLA_GRIDROT, m_descrMLA.fGridRot_rad, true);
+        m_pSliderWidget->SetValue(PT_SLIDER_MLA_MLENSDIST, m_descrMLA.GetfMicroImageDistance_px(), true);
+        m_pSliderWidget->SetValue(PT_SLIDER_MLA_SENSORDIST, m_descrMLA.fMicroLensPrincipalDist_px*m_descrMLA.fPixelsize_mm, true);
+        m_pSliderWidget->SetValue(PT_SLIDER_MLA_MAINPRINCPOINTX, float(m_descrMLA.vfMainPrincipalPoint_px.x) / float(m_descrMLA.viSensorRes_px.x), true);
+        m_pSliderWidget->SetValue(PT_SLIDER_MLA_MAINPRINCPOINTY, float(m_descrMLA.vfMainPrincipalPoint_px.y) / float(m_descrMLA.viSensorRes_px.y), true);
+        m_pSliderWidget->SetValue(PT_SLIDER_MLA_SHIFTX, m_descrMLA.vMlaCenter_px.x - 0.5f*float(m_descrMLA.viSensorRes_px.x-1), true);
+        m_pSliderWidget->SetValue(PT_SLIDER_MLA_SHIFTY, m_descrMLA.vMlaCenter_px.y - 0.5f*float(m_descrMLA.viSensorRes_px.y-1), true);
     }
     catch (std::exception& exc)
     {
@@ -232,64 +232,64 @@ void QtPlenopticTools::MainWindow::OnSliderValue_changed(const QString& strIdent
 
     if (strIdentifier == PT_SLIDER_MLA_GRIDROT)
     {
-        m_descrHexMLA.fGridRot_rad = float(dblValue);
+        m_descrMLA.fGridRot_rad = float(dblValue);
         flagMlaChanged = true;
     }
     else if (strIdentifier == PT_SLIDER_MLA_MLENSDIST)
     {
         // Slider is micro image distance, so it scales micro lens grid not micro
         // image grid.
-        m_descrHexMLA.fMicroLensDistance_px = float(dblValue) / m_descrHexMLA.fMlaImageScale;
+        m_descrMLA.fMicroLensDistance_px = float(dblValue) / m_descrMLA.fMlaImageScale;
         flagMlaChanged = true;
     }
     else if (strIdentifier == PT_SLIDER_MLA_MLIMAGESCALE)
     {
         // Altering micro image scale shall change micro lens grid, not image grid...
         // ...scale micro lens dist to micro image dist using old scale
-        m_descrHexMLA.fMicroLensDistance_px *= m_descrHexMLA.fMlaImageScale;
-        m_descrHexMLA.fMlaImageScale = float(dblValue);
+        m_descrMLA.fMicroLensDistance_px *= m_descrMLA.fMlaImageScale;
+        m_descrMLA.fMlaImageScale = float(dblValue);
         // ...scale micro image dist to micro lens dist using new scale
-        m_descrHexMLA.fMicroLensDistance_px /= m_descrHexMLA.fMlaImageScale;
+        m_descrMLA.fMicroLensDistance_px /= m_descrMLA.fMlaImageScale;
         flagMlaChanged = true;
     }
     else if (strIdentifier == PT_SLIDER_MLA_SENSORDIST)
     {
-        m_descrHexMLA.fMicroLensPrincipalDist_px = float(dblValue) / m_descrHexMLA.fPixelsize_mm;
+        m_descrMLA.fMicroLensPrincipalDist_px = float(dblValue) / m_descrMLA.fPixelsize_mm;
         flagMlaChanged = true;
     }
     else if (strIdentifier == PT_SLIDER_MLA_MAINFLEN)
     {
-        m_descrHexMLA.fMainLensFLength_mm = float(dblValue);
+        m_descrMLA.fMainLensFLength_mm = float(dblValue);
     }
     else if (strIdentifier == PT_SLIDER_MLA_MLAMAINLENSDIST)
     {
-        m_descrHexMLA.mtMlaPose_L_MLA.t_rl_l.z = float(dblValue);
+        m_descrMLA.mtMlaPose_L_MLA.t_rl_l.z = float(dblValue);
         flagMlaChanged = true;
     }
     else if (strIdentifier == PT_SLIDER_MLA_PXSIZE)
     {
-        m_descrHexMLA.fPixelsize_mm = float(dblValue);
+        m_descrMLA.fPixelsize_mm = float(dblValue);
         // micro lens principal distance (== MLA to sensor distance and K-matrix focal length) slider is mm -> normalize with actual pixel size
-        m_descrHexMLA.fMicroLensPrincipalDist_px
-            = m_pSliderWidget->GetValue(PT_SLIDER_MLA_SENSORDIST) / m_descrHexMLA.fPixelsize_mm;
+        m_descrMLA.fMicroLensPrincipalDist_px
+            = m_pSliderWidget->GetValue(PT_SLIDER_MLA_SENSORDIST) / m_descrMLA.fPixelsize_mm;
         flagMlaChanged = true;
     }
     else if (strIdentifier == PT_SLIDER_MLA_MAINPRINCPOINTX)
     {
-        m_descrHexMLA.vfMainPrincipalPoint_px.x = dblValue + 0.5f*float(m_descrHexMLA.viSensorRes_px.x-1);
+        m_descrMLA.vfMainPrincipalPoint_px.x = dblValue + 0.5f*float(m_descrMLA.viSensorRes_px.x-1);
     }
     else if (strIdentifier == PT_SLIDER_MLA_MAINPRINCPOINTY)
     {
-        m_descrHexMLA.vfMainPrincipalPoint_px.y = dblValue + 0.5f*float(m_descrHexMLA.viSensorRes_px.y-1);
+        m_descrMLA.vfMainPrincipalPoint_px.y = dblValue + 0.5f*float(m_descrMLA.viSensorRes_px.y-1);
     }
     else if (strIdentifier == PT_SLIDER_MLA_SHIFTX)
     {
-        m_descrHexMLA.vMlaCenter_px.x = dblValue + 0.5f*float(m_descrHexMLA.viSensorRes_px.x-1);
+        m_descrMLA.vMlaCenter_px.x = dblValue + 0.5f*float(m_descrMLA.viSensorRes_px.x-1);
         flagMlaChanged = true;
     }
     else if (strIdentifier == PT_SLIDER_MLA_SHIFTY)
     {
-        m_descrHexMLA.vMlaCenter_px.y = dblValue + 0.5f*float(m_descrHexMLA.viSensorRes_px.y-1);
+        m_descrMLA.vMlaCenter_px.y = dblValue + 0.5f*float(m_descrMLA.viSensorRes_px.y-1);
         flagMlaChanged = true;
     }
     else if ((strIdentifier == PT_SLIDER_ESTIMATOR_MINDISP)
@@ -480,7 +480,7 @@ void QtPlenopticTools::MainWindow::OnButton_triggered()
             QString fileName = QFileDialog::getOpenFileName(this, tr("Open File"),
                                                             "", tr("XML (*.xml)"));
             if (fileName.isEmpty() == false)
-                CPlenopticTools::ReadMlaDescription<true>(m_descrHexMLA, fileName.toStdString());
+                CPlenopticTools::ReadMlaDescription(m_descrMLA, fileName.toStdString());
             else
                 ui->textBrowser->append("No filename given!");
 
@@ -490,14 +490,14 @@ void QtPlenopticTools::MainWindow::OnButton_triggered()
                 int height = (m_spRawImage != nullptr) ? m_spRawImage->rows() : m_spVignettingImage->rows();
 
                 // Check consistency of MLA and images
-                if ((width != m_descrHexMLA.viSensorRes_px.x)||(height != m_descrHexMLA.viSensorRes_px.y))
+                if ((width != m_descrMLA.viSensorRes_px.x)||(height != m_descrMLA.viSensorRes_px.y))
                 {
                     _AppendText("Read MLA has sensor resolution incompatible to active image");
                     _ResetMLA();
                 }
             }
 
-            m_descrHexMLA.fMicroImageDiam_MLDistFrac = 0.95f;
+            m_descrMLA.fMicroImageDiam_MLDistFrac = 0.95f;
 
             // Update slider values in GUI
             _UpdateGUI();
@@ -511,7 +511,7 @@ void QtPlenopticTools::MainWindow::OnButton_triggered()
                                                             "", tr("XML (*.xml)"));
             if (fileName.isEmpty() == false)
             {
-                CPlenopticTools::WriteMlaDescription<true>(m_descrHexMLA, fileName.toStdString());
+                CPlenopticTools::WriteMlaDescription(m_descrMLA, fileName.toStdString());
                 ui->textBrowser->append("MLA description written to \"" + fileName + "\"");
             }
             else
@@ -657,7 +657,7 @@ void QtPlenopticTools::MainWindow::_ImportImage(const std::string strFilemame, c
         }
 
         // If image not compatible with loaded MLA, reset descriptor
-        if ((m_descrHexMLA.viSensorRes_px.x != m_spRawImage->cols())||(m_descrHexMLA.viSensorRes_px.y != m_spRawImage->rows()))
+        if ((m_descrMLA.viSensorRes_px.x != m_spRawImage->cols())||(m_descrMLA.viSensorRes_px.y != m_spRawImage->rows()))
         {
             _ResetMLA();
             _UpdateGUI();
@@ -687,8 +687,8 @@ void QtPlenopticTools::MainWindow::_ImportImage(const std::string strFilemame, c
         m_spWorkVignettingImage = nullptr;
         ui->graphicsViewMainImage->Clear();
 
-        if ((m_descrHexMLA.viSensorRes_px.x != m_spVignettingImage->cols())
-            ||(m_descrHexMLA.viSensorRes_px.y != m_spVignettingImage->rows()))
+        if ((m_descrMLA.viSensorRes_px.x != m_spVignettingImage->cols())
+            ||(m_descrMLA.viSensorRes_px.y != m_spVignettingImage->rows()))
         {
             // Image not compatible with loaded MLA, reset descriptor
             _ResetMLA();
@@ -744,7 +744,7 @@ void QtPlenopticTools::MainWindow::_ResetMLA()
     m_spRawPointColors = nullptr;
 
     // Reset values
-    m_descrHexMLA.Reset();
+    m_descrMLA.Reset();
     // use some defaults...
     int width = 1000;
     int height = 1000;
@@ -753,17 +753,15 @@ void QtPlenopticTools::MainWindow::_ResetMLA()
         width = (m_spRawImage != nullptr) ? m_spRawImage->cols() : m_spVignettingImage->cols();
         height = (m_spRawImage != nullptr) ? m_spRawImage->rows() : m_spVignettingImage->rows();
     }
-    m_descrHexMLA.viSensorRes_px.Set(width, height);
-    m_descrHexMLA.fMicroLensDistance_px = float(width)/200.0f;
-    m_descrHexMLA.fMlaImageScale = 1.0f;
-    m_descrHexMLA.vMlaCenter_px.Set(0.5f * (m_descrHexMLA.viSensorRes_px.x-1),
-                                    0.5f * (m_descrHexMLA.viSensorRes_px.y-1));
-    m_descrHexMLA.vfMainPrincipalPoint_px = 0.5f * vec2<float>(m_descrHexMLA.viSensorRes_px);
-    m_descrHexMLA.fMainLensFLength_mm = 100;
-    m_descrHexMLA.mtMlaPose_L_MLA.t_rl_l.z = 123;
-    m_descrHexMLA.fPixelsize_mm = 0.005f;
-
-    m_descrRegularMLA.Reset();
+    m_descrMLA.viSensorRes_px.Set(width, height);
+    m_descrMLA.fMicroLensDistance_px = float(width)/200.0f;
+    m_descrMLA.fMlaImageScale = 1.0f;
+    m_descrMLA.vMlaCenter_px.Set(0.5f * (m_descrMLA.viSensorRes_px.x-1),
+                                    0.5f * (m_descrMLA.viSensorRes_px.y-1));
+    m_descrMLA.vfMainPrincipalPoint_px = 0.5f * vec2<float>(m_descrMLA.viSensorRes_px);
+    m_descrMLA.fMainLensFLength_mm = 100;
+    m_descrMLA.mtMlaPose_L_MLA.t_rl_l.z = 123;
+    m_descrMLA.fPixelsize_mm = 0.005f;
 
     if (ui->checkBox_DrawMLA->isChecked() == true)
         _DrawMLA();
@@ -797,10 +795,10 @@ void QtPlenopticTools::MainWindow::_ComputeDepth()
         CVImage_sptr spWeightImage(new CVImage(m_spWorkRawImage->cols(), m_spWorkRawImage->rows(), CV_32FC1, EImageType::GRAYDEPTH));
         // Set disparity estimation parameters
         SParamsDisparityEstimation_OFL params;
-        params.descrMla = m_descrHexMLA;
+        params.descrMla = m_descrMLA;
         params.flagRefine = ui->checkBox_Refine->isChecked();
         params.fMinCurvature = m_pSliderWidget->GetValue(PT_SLIDER_ESTIMATOR_MINCURVE);
-        params.fDispRange_px = 4.0f * m_descrHexMLA.fMicroLensDistance_px
+        params.fDispRange_px = 4.0f * m_descrMLA.fMicroLensDistance_px
                                * float(CCUDADisparityEstimation_OFL_DNORMALIZED_MAX - CCUDADisparityEstimation_OFL_DNORMALIZED_MIN) / float(DISPSTEPS_INITIAL);
         // Apply disparity estimation to raw-image member (normalized with vignetting image if available)
         CCUDADisparityEstimation_OFL cudaEstimator;
@@ -834,7 +832,7 @@ void QtPlenopticTools::MainWindow::_ComputeFusion()
     if (ui->checkBox_CrossCheck->isChecked() == true)
     {
         CCUDADisparityCrosscheck::Estimate(spDispImage, m_spLFDepthMap,
-                                           m_descrHexMLA,
+                                           m_descrMLA,
                                            m_pSliderWidget->GetValue(PT_SLIDER_ESTIMATOR_MAXDISPDELTA));
     }
     else
@@ -864,7 +862,7 @@ void QtPlenopticTools::MainWindow::_ComputeFusion()
                                         outFLen / projTarget.fPixelsize_mm,
                                         0, vec2<float>( 0, 0 ));
         // Get approx. distance to far plane of scene given by max. disparity slider
-        float fFarPlaneDist = m_descrHexMLA.MapDisparityToObjectSpaceDepth(m_pSliderWidget->GetValue(PT_SLIDER_ESTIMATOR_MAXDISP));
+        float fFarPlaneDist = m_descrMLA.MapDisparityToObjectSpaceDepth(m_pSliderWidget->GetValue(PT_SLIDER_ESTIMATOR_MAXDISP));
         // Project scene center to camera to get new principal point
         vfFusedImagePrincipalPoint = projTarget.Project(vec3<float>(0, 0, fFarPlaneDist));
         // Make PP relative to top-left of image
@@ -877,7 +875,7 @@ void QtPlenopticTools::MainWindow::_ComputeFusion()
                                    0, vfFusedImagePrincipalPoint);
 
     CCUDAMicrolensFusion::Unproject(m_spRawPoints3D, m_spRawPointColors, m_spDepth2D, m_spAllInFocus,
-                                    spDispImage, m_spWorkRawImage, m_descrHexMLA, projTarget,
+                                    spDispImage, m_spWorkRawImage, m_descrMLA, projTarget,
                                     m_pSliderWidget->GetValue(PT_SLIDER_ESTIMATOR_MINDISP),
                                     m_pSliderWidget->GetValue(PT_SLIDER_ESTIMATOR_MAXDISP));
 
@@ -894,16 +892,16 @@ void QtPlenopticTools::MainWindow::_ComputeFusion()
     }
 
     CCUDAMicrolensFusion::ImageSynthesis<unsigned char>(m_spAllInFocus, m_spDepth2D, m_spWorkRawImage,
-                                                        m_descrHexMLA, projTarget);
+                                                        m_descrMLA, projTarget);
     ui->graphicsViewThirdImage->SetImage(*m_spAllInFocus);
 
     if (true)
     {
         // normalize depth map and scale to 255 based on set raw depth disparity
         double dMax =
-            -m_descrHexMLA.MapDisparityToObjectSpaceDepth(m_pSliderWidget->GetValue(PT_SLIDER_ESTIMATOR_MINDISP));
+            -m_descrMLA.MapDisparityToObjectSpaceDepth(m_pSliderWidget->GetValue(PT_SLIDER_ESTIMATOR_MINDISP));
         double dMin =
-            -m_descrHexMLA.MapDisparityToObjectSpaceDepth(m_pSliderWidget->GetValue(PT_SLIDER_ESTIMATOR_MAXDISP));
+            -m_descrMLA.MapDisparityToObjectSpaceDepth(m_pSliderWidget->GetValue(PT_SLIDER_ESTIMATOR_MAXDISP));
 
         // convert to colored map
         CVImage_sptr spTempMap(new CVImage());
@@ -976,9 +974,9 @@ void QtPlenopticTools::MainWindow::_ExportImages(const std::string& strFilenameB
         {
             // normalize depth map and scale to 255 based on set raw depth disparity
             double dMax =
-                -m_descrHexMLA.MapDisparityToObjectSpaceDepth(m_pSliderWidget->GetValue(PT_SLIDER_ESTIMATOR_MINDISP));
+                -m_descrMLA.MapDisparityToObjectSpaceDepth(m_pSliderWidget->GetValue(PT_SLIDER_ESTIMATOR_MINDISP));
             double dMin =
-                -m_descrHexMLA.MapDisparityToObjectSpaceDepth(m_pSliderWidget->GetValue(PT_SLIDER_ESTIMATOR_MAXDISP));
+                -m_descrMLA.MapDisparityToObjectSpaceDepth(m_pSliderWidget->GetValue(PT_SLIDER_ESTIMATOR_MAXDISP));
 
             // convert to colored map
             CVImage_sptr spTempMap(new CVImage());
@@ -1029,7 +1027,7 @@ void QtPlenopticTools::MainWindow::_ExportImages(const std::string& strFilenameB
         if (ui->checkBox_CrossCheck->isChecked() == true)
         {
             CCUDADisparityCrosscheck::Estimate(spExportImage, m_spLFDepthMap,
-                                               m_descrHexMLA, m_pSliderWidget->GetValue(PT_SLIDER_ESTIMATOR_MAXDISPDELTA));
+                                               m_descrMLA, m_pSliderWidget->GetValue(PT_SLIDER_ESTIMATOR_MAXDISPDELTA));
         }
         else
         {
@@ -1174,7 +1172,7 @@ void QtPlenopticTools::MainWindow::_DrawMLA()
     {
         spDisplayImage = CVImage_sptr(new CVImage());
         m_spWorkVignettingImage->Clone(*spDisplayImage);
-        mlaV.DrawMLA(spDisplayImage, spDisplayImage, m_descrHexMLA);
+        mlaV.DrawMLA(spDisplayImage, spDisplayImage, m_descrMLA);
         // display vignetting image containing MLA visualization
         ui->graphicsViewThirdImage->SetImage(*spDisplayImage);
     }
@@ -1182,7 +1180,7 @@ void QtPlenopticTools::MainWindow::_DrawMLA()
     {
         spDisplayImage = CVImage_sptr(new CVImage());
         m_spWorkRawImage->Clone(*spDisplayImage);
-        mlaV.DrawMLA(spDisplayImage, spDisplayImage, m_descrHexMLA);
+        mlaV.DrawMLA(spDisplayImage, spDisplayImage, m_descrMLA);
         // display raw image containing MLA visualization
         ui->graphicsViewMainImage->SetImage(*spDisplayImage);
     }
@@ -1207,7 +1205,7 @@ void QtPlenopticTools::MainWindow::_DisplayColoredDepth()
     if (ui->checkBox_CrossCheck->isChecked() == true)
     {
         CCUDADisparityCrosscheck::Estimate(spDispImage, m_spLFDepthMap,
-                                           m_descrHexMLA,
+                                           m_descrMLA,
                                            m_pSliderWidget->GetValue(PT_SLIDER_ESTIMATOR_MAXDISPDELTA));
     }
     else
@@ -1255,7 +1253,7 @@ void QtPlenopticTools::MainWindow::_UpdateWorkImages(const bool flagDrawImages)
         if (m_spRawImage != nullptr)
         {
             m_spWorkRawImage = CVImage_sptr(new CVImage(m_spRawImage->GetImageDataDescriptor()));
-            CVignettingNormalization_CUDA::NormalizeImage(m_spWorkRawImage, m_spRawImage, m_spVignettingImage, 1.0f, m_descrHexMLA);// 0.9f);//0.7f);
+            CVignettingNormalization_CUDA::NormalizeImage(m_spWorkRawImage, m_spRawImage, m_spVignettingImage, 1.0f, m_descrMLA);// 0.9f);//0.7f);
             _AppendText("OnImageSent : Applied de-vignetting to raw input image.");
 
             // Convert ALL work images to RGBA (apply debayering if needed)

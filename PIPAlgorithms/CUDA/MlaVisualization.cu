@@ -20,11 +20,11 @@
 #include "MlaVisualization.hh"
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-template<const int t_intChannelCount, typename OUTPUTSTORAGETYPE>
+template<const int t_intChannelCount, const PIP::EGridType t_eGridType, typename OUTPUTSTORAGETYPE>
 __global__
 void kernel_DrawMLA(cudaTextureObject_t texRawImage,
         OUTPUTSTORAGETYPE* pOutputImage, const int intWidth, const int intHeight,
-        const PIP::SPlenCamDescription<true> descrMla, const float fOutputScale)
+        const PIP::SPlenCamDescription descrMla, const float fOutputScale)
 {
     const int idxX = blockIdx.x * blockDim.x + threadIdx.x;
     const int idxY = blockIdx.y * blockDim.y + threadIdx.y;
@@ -34,13 +34,13 @@ void kernel_DrawMLA(cudaTextureObject_t texRawImage,
     PIP::vec2<float> vIdcs;
     vIdcs.Set(idxX, idxY);
     // Get the pixels position in grid coords in micro image domain
-    const PIP::vec2<float> vLensGridIdx = descrMla.PixelToLensImageGrid(vIdcs);
+    const PIP::vec2<float> vLensGridIdx = descrMla.PixelToLensImageGrid<t_eGridType>(vIdcs);
     // Get the micro lens index (in micro lens domain) containing the pixel. I.e. lens index closest to pixel
-    const PIP::vec2<float> vLensGridIdx_rounded = descrMla.GridRound(vLensGridIdx);
+    const PIP::vec2<float> vLensGridIdx_rounded = descrMla.GridRound<t_eGridType>(vLensGridIdx);
     // Distance between lens center and pixel
-    const float fLensCenterDist_px = (vIdcs - descrMla.LensCenterGridToPixel(vLensGridIdx_rounded)).length();
+    const float fLensCenterDist_px = (vIdcs - descrMla.LensCenterGridToPixel<t_eGridType>(vLensGridIdx_rounded)).length();
     // Distance between micro image center and pixel
-    const float fDistToImageCenter_px = (vIdcs - descrMla.LensImageGridToPixel(vLensGridIdx_rounded)).length();
+    const float fDistToImageCenter_px = (vIdcs - descrMla.LensImageGridToPixel<t_eGridType>(vLensGridIdx_rounded)).length();
 
     // Mix factor for coloring.  0: pixel far (>10 percent) from lens center, 1: pixel is lens center
     float fMixCenter = 1.0f/0.05f * (0.05f - fLensCenterDist_px / descrMla.fMicroLensDistance_px);
@@ -83,9 +83,9 @@ void kernel_DrawMLA(cudaTextureObject_t texRawImage,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-template<typename OUTPUTSTORAGETYPE>
+template<typename OUTPUTSTORAGETYPE, const PIP::EGridType t_eGridType>
 void PIP::CMlaVisualization_CUDA::_DrawMLA(const CVImage_sptr& spRawImage, CVImage_sptr& spOutputImage,
-        const SPlenCamDescription<true> descrMla, const float fNormalizationScale)
+        const SPlenCamDescription descrMla, const float fNormalizationScale)
 {
     const int width =  spRawImage->cols();
     const int height = spRawImage->rows();
@@ -103,14 +103,14 @@ void PIP::CMlaVisualization_CUDA::_DrawMLA(const CVImage_sptr& spRawImage, CVIma
     switch (spRawImage->CvMat().channels())
     {
       case 1:
-          kernel_DrawMLA<1, OUTPUTSTORAGETYPE><<<threadDims, blockDims>>>(cudaTex_Raw.GetTextureObject(),
+          kernel_DrawMLA<1, t_eGridType, OUTPUTSTORAGETYPE><<<threadDims, blockDims>>>(cudaTex_Raw.GetTextureObject(),
                                                                           cudaImageArray_Output.GetDevicePointer(),
                                                                           width, height,
                                                                           descrMla, fNormalizationScale);
           break;
 
       case 4:
-          kernel_DrawMLA<4, OUTPUTSTORAGETYPE><<<threadDims, blockDims>>>(cudaTex_Raw.GetTextureObject(),
+          kernel_DrawMLA<4, t_eGridType, OUTPUTSTORAGETYPE><<<threadDims, blockDims>>>(cudaTex_Raw.GetTextureObject(),
                                                                           cudaImageArray_Output.GetDevicePointer(),
                                                                           width, height,
                                                                           descrMla, fNormalizationScale);
@@ -128,12 +128,18 @@ void PIP::CMlaVisualization_CUDA::_DrawMLA(const CVImage_sptr& spRawImage, CVIma
     }
 }
 
-template void PIP::CMlaVisualization_CUDA::_DrawMLA<unsigned char>(const CVImage_sptr& spRawImage, CVImage_sptr& spOutputImage,
-        const SPlenCamDescription<true> descrMla, const float fNormalizationScale);
-template void PIP::CMlaVisualization_CUDA::_DrawMLA<unsigned short>(const CVImage_sptr& spRawImage, CVImage_sptr& spOutputImage,
-        const SPlenCamDescription<true> descrMla, const float fNormalizationScale);
-template void PIP::CMlaVisualization_CUDA::_DrawMLA<float>(const CVImage_sptr& spRawImage, CVImage_sptr& spOutputImage,
-        const SPlenCamDescription<true> descrMla, const float fNormalizationScale);
+template void PIP::CMlaVisualization_CUDA::_DrawMLA<unsigned char, PIP::EGridType::HEXAGONAL>(const CVImage_sptr& spRawImage, CVImage_sptr& spOutputImage,
+        const SPlenCamDescription descrMla, const float fNormalizationScale);
+template void PIP::CMlaVisualization_CUDA::_DrawMLA<unsigned char, PIP::EGridType::RECTANGULAR>(const CVImage_sptr& spRawImage, CVImage_sptr& spOutputImage,
+        const SPlenCamDescription descrMla, const float fNormalizationScale);
+template void PIP::CMlaVisualization_CUDA::_DrawMLA<unsigned short, PIP::EGridType::HEXAGONAL>(const CVImage_sptr& spRawImage, CVImage_sptr& spOutputImage,
+        const SPlenCamDescription descrMla, const float fNormalizationScale);
+template void PIP::CMlaVisualization_CUDA::_DrawMLA<unsigned short, PIP::EGridType::RECTANGULAR>(const CVImage_sptr& spRawImage, CVImage_sptr& spOutputImage,
+        const SPlenCamDescription descrMla, const float fNormalizationScale);
+template void PIP::CMlaVisualization_CUDA::_DrawMLA<float, PIP::EGridType::HEXAGONAL>(const CVImage_sptr& spRawImage, CVImage_sptr& spOutputImage,
+        const SPlenCamDescription descrMla, const float fNormalizationScale);
+template void PIP::CMlaVisualization_CUDA::_DrawMLA<float, PIP::EGridType::RECTANGULAR>(const CVImage_sptr& spRawImage, CVImage_sptr& spOutputImage,
+        const SPlenCamDescription descrMla, const float fNormalizationScale);
 
 
 

@@ -55,7 +55,7 @@ public:
     ///
     static inline void NormalizeImage(CVImage_sptr& spNormalizedImage, const CVImage_sptr& spRawImage,
             const CVImage_sptr& spVignettingImage, const float fHistScaleFraction,
-            const SPlenCamDescription<true>& descrMLA)
+            const SPlenCamDescription& descrMLA)
     {
         if (spNormalizedImage->CvMat().depth() == CV_8U)
         {
@@ -78,7 +78,7 @@ protected:
     template<typename OUTPUTTYPE>
     static void _NormalizeImage(CVImage_sptr& spNormalizedImage, const CVImage_sptr& spRawImage,
             const CVImage_sptr& spVignettingImage, const float fHistScaleFraction,
-            const SPlenCamDescription<true>& descrMLA);
+            const SPlenCamDescription& descrMLA);
 
 };
 }

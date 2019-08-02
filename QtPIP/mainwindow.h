@@ -182,9 +182,7 @@ private:
     PIP::CVImage_sptr m_spDepth2D = nullptr;
 
     /// Structure defining properties of used MLA, if of hexagonal type
-    PIP::SPlenCamDescription<true> m_descrHexMLA;
-    /// Structure defining properties of used MLA, if of regular type
-    PIP::SPlenCamDescription<false> m_descrRegularMLA;
+    PIP::SPlenCamDescription m_descrMLA;
 
     ///
     QMainWindow* m_pWinSliders = nullptr;

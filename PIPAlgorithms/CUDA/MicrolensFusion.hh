@@ -22,9 +22,28 @@
 #include "PIPInterOpCUDA/CUDA/CudaHelper.hh"
 #include "PIPBase/PlenopticTypes.hh"
 #include "PIPBase/CVImage.hh"
+#include "PIPAlgorithms/AlgorithmInterfaces.hh"
 
 namespace  PIP
 {
+
+class CCUDAUnprojectRaw final : public IUnprojectFromDisparity
+{
+public:
+    CCUDAUnprojectRaw() {}
+    virtual ~CCUDAUnprojectRaw() {}
+
+    virtual void UnprojectDisparities(CVImage_sptr& spPoints3D, CVImage_sptr& spPointsColors,
+                                      CVImage_sptr &spDepthmap, CVImage_sptr &spSynthImage,
+                                      const CVImage_sptr& spDisparties,
+                                      const CVImage_sptr& spPlenopticImage);
+
+protected:
+    SPlenCamDescription descrMLA;
+    MTCamProjection<float> projTarget;
+    float fMinNormedDisp;
+    float fMaxNormedDisp;
+};
 
 ///
 /// \brief The CCUDAMicrolensFusion class provids algorithms to fuse raw images and depth maps to
@@ -52,7 +71,7 @@ public:
     ///
     static void Unproject(CVImage_sptr& spPoints3D, CVImage_sptr& spPointsColors, CVImage_sptr &spDepthmap, CVImage_sptr &spSynthImage,
                           const CVImage_sptr& spDisparties, const CVImage_sptr& spPlenopticImage,
-                          const SPlenCamDescription<true>& descrMLA, const MTCamProjection<float> projTarget,
+                          const SPlenCamDescription& descrMLA, const MTCamProjection<float> projTarget,
                           const float fMinNormedDisp, const float fMaxNormedDisp);
 
     ///
@@ -67,7 +86,7 @@ public:
     template<typename OUTPUTSTORAGETYPE>
     static void ImageSynthesis(CVImage_sptr &spSynthImage, const CVImage_sptr& spDepth2D,
                                const CVImage_sptr& spPlenopticImage,
-                               const SPlenCamDescription<true>& descrMLA, const MTCamProjection<float> projTarget);
+                               const SPlenCamDescription& descrMLA, const MTCamProjection<float> projTarget);
 
     ///
     /// \brief MedianFill applies median to depthmap for filling and smoothing
