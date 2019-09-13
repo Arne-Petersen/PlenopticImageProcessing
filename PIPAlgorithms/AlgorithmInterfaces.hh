@@ -23,8 +23,42 @@
 #include "PIPInterOpCUDA/CUDA/CudaHelper.hh"
 #include "PIPBase/PlenopticTypes.hh"
 
+#include <map>
+
 namespace PIP
 {
+
+///
+/// \brief StdMapTestAndGet returns value of map for key, throws if key invalid
+/// \param mapParams input map
+/// \param cstrKey input key
+/// \return value at key
+///
+/// Exceptions: throws if key not in map
+///
+inline double StdMapTestAndGet(const std::map<std::string,double>& mapParams, const char* cstrKey)
+{
+    const auto it = mapParams.find(cstrKey);
+    if (it == mapParams.end())
+    {
+        throw CRuntimeException("StdMapTestAndGet :: parameter key \"" + std::string(cstrKey) + "\" not found!");
+    }
+    return it->second;
+}
+
+///
+/// \brief StdMapTestAndGet returns value of map for key, throws if key invalid
+/// \param mapParams input map
+/// \param strKey input key
+/// \return value at key
+///
+/// Exceptions: throws if key not in map
+///
+inline double StdMapTestAndGet(const std::map<std::string,double>& mapParams, const std::string strKey)
+{
+    return StdMapTestAndGet(mapParams, strKey.c_str());
+}
+
 //////////////////////////////////////////////////////////////////////////////////////////
 ///
 /// \brief The IDisparityEstimation interface to be specialized for disparity estimation algorithms.
@@ -35,6 +69,15 @@ class IDisparityEstimation
 public:
     IDisparityEstimation() {}
     virtual ~IDisparityEstimation() {}
+
+    ///
+    /// \brief SetParameters provides MLA description and additional parameters to this.
+    /// \param descrMLA description of MLA
+    /// \param mapAdditionalParams additional parameters
+    ///
+    /// Exceptions: throws if a required parameter is not in map
+    ///
+    virtual void SetParameters(const SPlenCamDescription& descrMLA, const std::map<std::string,double>& mapAdditionalParams) = 0;
 
     ///
     /// \brief EstimateDisparities applies disparity estimation to given plenoptic image.
@@ -55,15 +98,21 @@ public:
 ///
 /// \brief The IDisparityRefinement interface to be specialized for disparity refinement algorithms.
 ///
-/// Input and output image are allowed to be the same image reference. Input image is to be uploaded
-/// to CUDA texture memory in implementation (use \ref CCUDAImageTexture).
-///
 //////////////////////////////////////////////////////////////////////////////////////////
 class IDisparityRefinement
 {
 public:
     IDisparityRefinement() {}
     virtual ~IDisparityRefinement() {}
+
+    ///
+    /// \brief SetParameters provides MLA description and additional parameters to this.
+    /// \param descrMLA description of MLA
+    /// \param mapAdditionalParams additional parameters
+    ///
+    /// Exceptions: throws if a required parameter is not in map
+    ///
+    virtual void SetParameters(const SPlenCamDescription& descrMLA, const std::map<std::string,double>& mapAdditionalParams) = 0;
 
     ///
     /// \brief RefineDisparities applies disparity refinement to given disparity map.
@@ -86,9 +135,6 @@ public:
 /// \brief The IUnprojectFromDisparity interface to be specialized for virtual to object
 ///        space mapping algorithms.
 ///
-/// Input and output image are allowed to be the same image reference. Input image is
-/// to be uploaded to CUDA texture memory in implementation (use \ref CCUDAImageTexture).
-///
 //////////////////////////////////////////////////////////////////////////////////////////
 class IUnprojectFromDisparity
 {
@@ -97,23 +143,109 @@ public:
     virtual ~IUnprojectFromDisparity() {}
 
     ///
+    /// \brief SetParameters provides MLA description and additional parameters to this.
+    /// \param descrMLA description of MLA
+    /// \param projTarget target camera projection
+    /// \param mapAdditionalParams additional parameters
+    ///
+    /// \ref projTarget is unused if \ref UnprojectDisparities is called with parameters
+    /// spDepthmap and spSynthImage set to nullptr.
+    ///
+    /// Exceptions: throws if a required parameter is not in map
+    ///
+    virtual void SetParameters(const SPlenCamDescription& descrMLA,
+                               const MTCamProjection<float>& projTarget,
+                               const std::map<std::string,double>& mapAdditionalParams) = 0;
+
+    ///
     /// \brief UnprojectDisparities applies mapping disparities to object space,
     ///        optionally object space depth map and AiF image are generated.
     /// \param spPoints3D per raw pixel object space position
-    /// \param spPointsColors object space points' colors
+    /// \param spPointsColors object space points' colors, correspondes to \ref spPoints3D
     /// \param spDepthmap [optional] object space 2.5D depthmap
     /// \param spSynthImage [optional] AiF image for \ref spDepthmap
-    /// \param spDisparities input image
-    /// \param spPlenopticImage input raw image
+    /// \param spDisparities input raw disparity map
+    /// \param spPlenopticImage input raw plenoptic image
     ///
-    /// The estimated disparities are normalized with active baseline. That is, the disparity
+    /// The input disparities are normalized with active baseline. That is, the disparity
     /// in [px] is normalized with the lens baseline in [px].
-    /// Not matched (range checks etc) or removed (e.g. due to min. curvature) are set to 0.
+    /// Not matched (range checks etc) or removed (e.g. due to min. curvature) are assumed
+    /// to be 0.
     ///
     virtual void UnprojectDisparities(CVImage_sptr& spPoints3D, CVImage_sptr& spPointsColors,
                                       CVImage_sptr &spDepthmap, CVImage_sptr &spSynthImage,
                                       const CVImage_sptr& spDisparties,
                                       const CVImage_sptr& spPlenopticImage) = 0;
+};
+
+//////////////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief The IAllInFocusSynthesis interface to be specialized for synthesis of all-in-focus
+///         images from 2.5D depthmap and plenoptic raw image
+///
+//////////////////////////////////////////////////////////////////////////////////////////
+class IAllInFocusSynthesis
+{
+public:
+    IAllInFocusSynthesis() {}
+    virtual ~IAllInFocusSynthesis() {}
+
+    ///
+    /// \brief SetParameters provides MLA description, target projection and additional parameters to this.
+    /// \param descrMLA description of MLA
+    /// \param projTarget target camera
+    /// \param mapAdditionalParams additional parameters
+    ///
+    /// Exceptions: throws if a required parameter is not in map
+    ///
+    virtual void SetParameters(const SPlenCamDescription& descrMLA,
+                               const MTCamProjection<float> projTarget,
+                               const std::map<std::string,double>& mapAdditionalParams) = 0;
+
+    ///
+    /// \brief ImageSynthesis creates all-in-focus image from 2.5D depthmap and raw LF image
+    ///
+    /// \param spSynthImage all-in-focues image
+    /// \param spDepth2D 2.5D depthmap
+    /// \param spPlenopticImage raw LF image
+    /// \param descrMLA plenoptic camera props
+    /// \param projTarget target camera
+    ///
+    virtual void SynthesizeAiF(CVImage_sptr &spSynthImage, const CVImage_sptr& spDepth2D,
+                               const CVImage_sptr& spPlenopticImage) = 0;
+};
+
+//////////////////////////////////////////////////////////////////////////////////////////
+///
+/// \brief The IFillDepth2D interface to be specialized for filling of 2.5D depthmap
+///
+//////////////////////////////////////////////////////////////////////////////////////////
+class IFillDepth2D
+{
+public:
+    IFillDepth2D() {}
+    virtual ~IFillDepth2D() {}
+
+    ///
+    /// \brief SetParameters provides MLA description, target projection and additional parameters to this.
+    /// \param descrMLA description of MLA
+    /// \param projTarget target camera
+    /// \param mapAdditionalParams additional parameters
+    ///
+    /// Exceptions: throws if a required parameter is not in map
+    ///
+    virtual void SetParameters(const std::map<std::string,double>& mapParams) = 0;
+
+    ///
+    /// \brief ImageSynthesis creates all-in-focus image from 2.5D depthmap and raw LF image
+    ///
+    /// \param spSynthImage all-in-focues image
+    /// \param spDepth2D 2.5D depthmap
+    /// \param spPlenopticImage raw LF image
+    /// \param descrMLA plenoptic camera props
+    /// \param projTarget target camera
+    ///
+    virtual void Fill(CVImage_sptr& spDepth2D) = 0;
 };
 
 } // namespace  PIP

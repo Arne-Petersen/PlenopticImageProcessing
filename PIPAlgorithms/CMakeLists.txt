@@ -33,10 +33,12 @@ SET(PIPAlgorithms_CUDA_SRCS
     CUDA/VignettingNormalization.cu
     CUDA/MlaVisualization.hh
     CUDA/MlaVisualization.cu
+    CUDA/UnprojectFromDisparity_basic.hh
+    CUDA/UnprojectFromDisparity_basic.cu
     CUDA/MicrolensFusion.hh
     CUDA/MicrolensFusion.cu
-    CUDA/DisparityCrosscheck.hh
-    CUDA/DisparityCrosscheck.cu
+    CUDA/DisparityRefinement_Crosscheck.hh
+    CUDA/DisparityRefinement_Crosscheck.cu
     CUDA/DisparityEstimation_OFL.hh
     CUDA/DisparityEstimation_OFL.cu
     CUDA/DisparityEstimation_basic.hh

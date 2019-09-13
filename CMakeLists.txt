@@ -85,7 +85,7 @@ OPTION(BUILD_MFEXAMPLES "Build MODULEFRAMEWORK with examples." ON)
 
 ## Mandatory : get opencv package
 # find OpenCV cmake configuration file
-FIND_PACKAGE(OpenCV REQUIRED PATHS ${OpenCV_DIR} $ENV{OpenCV_DIR})
+FIND_PACKAGE(OpenCV REQUIRED PATHS $ENV{OpenCV_DIR} ${OpenCV_DIR})
 # find OpenCVs header files
 FIND_PATH(OpenCV_INCLUDE_DIR opencv2/opencv.hpp PATHS ${OpenCV_INCLUDE_DIR} $ENV{OpenCV_INCLUDE_DIR} /usr/local/include /usr/include)
 IF (NOT OpenCV_INCLUDE_DIR)

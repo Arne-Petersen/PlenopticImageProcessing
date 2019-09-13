@@ -17,7 +17,7 @@
  *    SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "DisparityCrosscheck.hh"
+#include "DisparityRefinement_Crosscheck.hh"
 
 #if !defined(WIN32) && !defined(_WIN32) && !defined(__WIN32)
 #include <unistd.h>
@@ -166,8 +166,7 @@ __global__ void computeCrosscheck(float* outputDisparities, cudaTextureObject_t 
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-void CCUDADisparityCrosscheck::Estimate(CVImage_sptr& spDispartiesOut, const CVImage_sptr& spDispartiesIn,
-        const SPlenCamDescription& descrMla, const float fMaxDispDiff)
+void CCUDADisparityRefinement_Crosscheck::RefineDisparities(CVImage_sptr& spDispartiesOut, const CVImage_sptr& spDispartiesIn)
 {
     cudaError_t e;
 
@@ -192,7 +191,7 @@ void CCUDADisparityCrosscheck::Estimate(CVImage_sptr& spDispartiesOut, const CVI
     dim3 threadsPerBlock = dim3(32, 32);
     dim3 blocks = dim3( spDispartiesIn->cols() / 32 + 1, spDispartiesIn->rows() / 32 + 1 );
 
-    cudaMemcpyToSymbol(globalMlaDescr, &descrMla, sizeof(SPlenCamDescription));
+    cudaMemcpyToSymbol(globalMlaDescr, &m_descMla, sizeof(SPlenCamDescription));
     if ((e = cudaGetLastError()) != 0)
     {
         throw CRuntimeException(std::string("PIP::CCUDADisparityCrosscheck::Estimate : CUDA copy-to-symbol : \"") + std::string(cudaGetErrorString(e)));
@@ -204,14 +203,14 @@ void CCUDADisparityCrosscheck::Estimate(CVImage_sptr& spDispartiesOut, const CVI
     cudaEventCreate(&stop);
     cudaEventRecord(start);
 
-    if (descrMla.eGridType == EGridType::HEXAGONAL)
+    if (m_descMla.eGridType == EGridType::HEXAGONAL)
         computeCrosscheck<EGridType::HEXAGONAL><<<blocks, threadsPerBlock>>>(arrOutput.GetDevicePointer(), texInput.GetTextureObject(),
                                                                              texInput.GetImageWidth(), texInput.GetImageHeight(),
-                                                                             fMaxDispDiff);
+                                                                             m_fMaxNormalizedDispDeviation);
     else
         computeCrosscheck<EGridType::RECTANGULAR><<<blocks, threadsPerBlock>>>(arrOutput.GetDevicePointer(), texInput.GetTextureObject(),
                                                                                texInput.GetImageWidth(), texInput.GetImageHeight(),
-                                                                               fMaxDispDiff);
+                                                                               m_fMaxNormalizedDispDeviation);
 
 
     // synchronize with kernels and check for errors

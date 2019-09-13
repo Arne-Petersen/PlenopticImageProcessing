@@ -18,6 +18,7 @@
  */
 
 #include "MicrolensFusion.hh"
+#include "CudaMinifuncs.cuh"
 
 using namespace PIP;
 
@@ -41,21 +42,6 @@ __device__ __constant__ SLocalParams globalParams;
 
 __device__ __constant__ int2 globalOffsetsGridIdcsHex[6];
 __device__ __constant__ int2 globalOffsetsGridIdcsReg[4];
-
-#define LENGTH4(X) (sqrtf(X.x*X.x + X.y*X.y + X.z*X.z + X.w*X.w))
-#define LENGTH2(X) (sqrtf(X.x*X.x + X.y*X.y))
-#define DIST2(X, Y) (sqrtf((X.x-Y.x)*(X.x-Y.x) + (X.y-Y.y)*(X.y-Y.y)))
-
-__device__ vec3<float> MapThinLens(const float fFLength, const vec3<float>&vPosIn)
-{
-    // Lens mapping scale given by absolute thin lens equation and switch of sign in 3rd
-    // component for direction change.
-    const float fScale = ((vPosIn.z > 0) ? -1.0f : 1.0f) * 1.0f / ( 1.0f/fFLength - 1.0f/fabsf(vPosIn.z));
-
-    vec3<float> vPosOut;
-    vPosOut.Set(fScale*vPosIn.x/vPosIn.z, fScale*vPosIn.y/vPosIn.z, fScale);
-    return vPosOut;
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 template<const int t_intChannels, const EGridType t_eGridType>
@@ -89,8 +75,10 @@ __global__ void computeUnproject(float* outputPoints3D, float* outputPointColors
     // get pinhole properties of micro camera relative to main lens
     PIP::MTCamProjection<float> projMicroLens = globalParams.descrMla.GetMicrocamProjection<t_eGridType>(vGridIndex);
     // 3-space position relative to main lens in mm
+//    vec3<float> vPos3D = projMicroLens.Unproject(vPixelPos_px,
+//                                                 globalParams.descrMla.fMicroLensPrincipalDist_px * globalParams.descrMla.fPixelsize_mm / fDisparity_baselines);
     vec3<float> vPos3D = projMicroLens.Unproject(vPixelPos_px,
-                                                 globalParams.descrMla.fMicroLensPrincipalDist_px * globalParams.descrMla.fPixelsize_mm / fDisparity_baselines);
+                                                 globalParams.descrMla.fMicroLensDistance_px * globalParams.descrMla.fPixelsize_mm / fDisparity_baselines);
 
     // project point through mainlens.
     vPos3D = MapThinLens(globalParams.descrMla.fMainLensFLength_mm, vPos3D);
@@ -185,36 +173,6 @@ __global__ void computeNormalizeSums(float* inoutDepthSum, float* inoutColorsAnd
     }
 }
 
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-template<const int t_intChannels>
-__device__ float4 getRGBAcolor(const vec2<float>& vPx, cudaTextureObject_t texInput)
-{
-    float4 vlCol;
-
-    // read pixel in given channel mode and write to 4-channel color output
-    if (t_intChannels == 1)
-    {
-        vlCol.x = tex2D<float>(texInput, vPx.x + 0.5f, vPx.y + 0.5f);
-        vlCol.y = vlCol.x;
-        vlCol.z = vlCol.x;
-        vlCol.w = 1.0f;
-    }
-    else if (t_intChannels == 2)
-    {
-        float2 vlTCol = tex2D<float2>(texInput, vPx.x + 0.5f, vPx.y + 0.5f);
-        vlCol.x = vlTCol.x;
-        vlCol.y = vlTCol.x;
-        vlCol.z = vlTCol.x;
-        vlCol.w = vlTCol.y;
-    }
-    else if (t_intChannels == 4)
-    {
-        vlCol = tex2D<float4>(texInput, vPx.x + 0.5f, vPx.y + 0.5f);
-    }
-    return vlCol;
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 template<typename OUTPUTSTORAGETYPE, const int t_intChannels, const EGridType t_eGridType>
 __global__ void computeImageSynthesis(OUTPUTSTORAGETYPE* outputSynthImage,
@@ -248,23 +206,49 @@ __global__ void computeImageSynthesis(OUTPUTSTORAGETYPE* outputSynthImage,
     vec2<float> vPos2D_px;
     vPos2D_px.Set( 1.0f / globalParams.descrMla.fPixelsize_mm * vVirtualPos3D_MM.x,
                    1.0f / globalParams.descrMla.fPixelsize_mm * vVirtualPos3D_MM.y );
+
+    const float temp = (vVirtualPos3D_MM.z - globalParams.descrMla.mtMlaPose_L_MLA.t_rl_l.z) * (globalParams.descrMla.fMlaImageScale - 1.0f)
+            + globalParams.descrMla.fPixelsize_mm * globalParams.descrMla.fMicroLensPrincipalDist_px;
+
+    vPos2D_px = globalParams.descrMla.fPixelsize_mm * globalParams.descrMla.fMicroLensPrincipalDist_px / temp * vPos2D_px;
+
+    //    const float fMlaConvergeDistVpos = -1.0f/(1.0f - globalParams.descrMla.fMlaImageScale) * globalParams.descrMla.fPixelsize_mm * globalParams.descrMla.fMicroLensPrincipalDist_px
+    //            + vVirtualPos3D_MM.z;
+    //    const float fMlaConvergeDistMla = -1.0f/(1.0f - globalParams.descrMla.fMlaImageScale) * globalParams.descrMla.fPixelsize_mm * globalParams.descrMla.fMicroLensPrincipalDist_px
+    //            + globalParams.descrMla.mtMlaPose_L_MLA.t_rl_l.z;
+    //    vPos2D_px *= fMlaConvergeDistMla/fMlaConvergeDistVpos;
+
     // Compenstate scale due to perspective imaging of MLs.
-    vPos2D_px *= globalParams.descrMla.mtMlaPose_L_MLA.t_rl_l.z / vVirtualPos3D_MM.z;
+    // vPos2D_px *= (globalParams.descrMla.mtMlaPose_L_MLA.t_rl_l.z + globalParams.descrMla.fPixelsize_mm * globalParams.descrMla.fMicroLensPrincipalDist_px) / vVirtualPos3D_MM.z;
+    // vPos2D_px *= 1.0f / globalParams.descrMla.fMlaImageScale;
+    // Relate position to top left of image
     vPos2D_px.x += globalParams.descrMla.vfMainPrincipalPoint_px.x;
     vPos2D_px.y += globalParams.descrMla.vfMainPrincipalPoint_px.y;
     // -> get closest lens index
-    //vec2<float> vMLensIndex = globalParams.descrMla.GridRound(globalParams.descrMla.PixelToLensCenterGrid(vPos2D_px));
-    vec2<float> vMLensIndex = globalParams.descrMla.GridRound<t_eGridType>(globalParams.descrMla.PixelToLensImageGrid<t_eGridType>(vPos2D_px));
+    vec2<float> vMLensIndex = globalParams.descrMla.GridRound<t_eGridType>(globalParams.descrMla.PixelToLensCenterGrid<t_eGridType>(vPos2D_px));
+    //vec2<float> vMLensIndex = globalParams.descrMla.GridRound<t_eGridType>(globalParams.descrMla.PixelToLensImageGrid<t_eGridType>(vPos2D_px));
 
     // Project virtual position to raw image using micro lens projection
     vec2<float> vRawLfPix_px;
     vRawLfPix_px = globalParams.descrMla.GetMicrocamProjection<t_eGridType>(vMLensIndex).Project(vVirtualPos3D_MM);
+
+    if ((vPixelPos_px.x == 200)&&(vPixelPos_px.y == 200))
+    {
+        printf("DL : %g\n", globalParams.descrMla.mtMlaPose_L_MLA.t_rl_l.z);
+        printf("DM : %g\n", globalParams.descrMla.fPixelsize_mm * globalParams.descrMla.fMicroLensPrincipalDist_px);
+        printf("Xz : %g\n", vVirtualPos3D_MM.z);
+        //printf("S/A : %g / %g = %g\n", fMlaConvergeDistMla, fMlaConvergeDistVpos, fMlaConvergeDistMla/fMlaConvergeDistVpos);
+        printf("vp : [%g ; %g]\n", vPos2D_px.x, vPos2D_px.y);
+        printf("vr : [%g ; %g]\n", vRawLfPix_px.x, vRawLfPix_px.y);
+    }
+
     // If pixel is too far from lens center, skip
     if ((vRawLfPix_px - globalParams.descrMla.GetMicroImageCenter_px<t_eGridType>(vMLensIndex)).length()
-        > 0.475f*globalParams.descrMla.fMicroLensDistance_px)
+            > 0.495f*globalParams.descrMla.fMicroLensDistance_px)
     {
         return;
     }
+
     // if image is out of bounds, skip
     if ((vRawLfPix_px.x < 0)||(vRawLfPix_px.y < 0)
         || (vRawLfPix_px.x > globalParams.vLowerRight.x-globalParams.vUpperLeft.x)
@@ -276,6 +260,9 @@ __global__ void computeImageSynthesis(OUTPUTSTORAGETYPE* outputSynthImage,
     // Weighted mean for color from lens neighbors.
     float4 vlCol = make_float4(0, 0, 0, 0);
     // Add color from center lens
+    // If pixel is too far from lens center, skip
+//    if ((vRawLfPix_px - globalParams.descrMla.GetMicroImageCenter_px<t_eGridType>(vMLensIndex)).length()
+//            < 0.495f*globalParams.descrMla.fMicroLensDistance_px)
     {
         const float4 vlRCol = getRGBAcolor<t_intChannels>(vRawLfPix_px, texInputPlenopticImage);
         vlCol.x += vlRCol.w * vlRCol.x;
@@ -293,7 +280,7 @@ __global__ void computeImageSynthesis(OUTPUTSTORAGETYPE* outputSynthImage,
         // Get projection to micro image
         vRawLfPix_px = globalParams.descrMla.GetMicrocamProjection<t_eGridType>(vfTargetLensIndex).Project(vVirtualPos3D_MM);
         // Reject pixel if out-of-lens border
-        if ((vRawLfPix_px - globalParams.descrMla.GetMicroImageCenter_px<t_eGridType>(vfTargetLensIndex)).length() > 0.475f*globalParams.descrMla.fMicroLensDistance_px)
+        if ((vRawLfPix_px - globalParams.descrMla.GetMicroImageCenter_px<t_eGridType>(vfTargetLensIndex)).length() > 0.495f*globalParams.descrMla.fMicroLensDistance_px)
         {
             continue;
         }

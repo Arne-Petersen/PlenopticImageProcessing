@@ -1,9 +1,9 @@
 /**
  * Copyright 2019 Arne Petersen, Kiel University
  *
- *    Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
+ *    Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
  *    associated documentation files (the "Software"), to deal in the Software without restriction, including
- *    without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or 
+ *    without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
  *    sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject
  *    to the following conditions:
  *
@@ -55,7 +55,7 @@ struct SParamsDisparityEstimation_OFL
     // Normalized disparity to stop estimation
     float fMaxDisparity = CCUDADisparityEstimation_OFL_DNORMALIZED_MAX;
     // Tested disparities in refinement : [dispInit - fDispRange_px/2 ... dispInit + fDispRange_px/2]
-    float fDispRange_px = 2.0f;
+    float fRefinementDisparityRange_px = 2.0f;
     // Minimal curvature of cost function at minimum position. 0 no validity filtering, >0.1f strong filtering
     float fMinCurvature = 0.0f;
     //
@@ -78,9 +78,30 @@ public:
     CCUDADisparityEstimation_OFL() {}
     virtual ~CCUDADisparityEstimation_OFL() {}
 
-    void SetParameters(const SParamsDisparityEstimation_OFL& params)
+    ///
+    /// \brief SetParameters provides MLA description and additional parameters to this.
+    /// \param descrMLA description of MLA
+    /// \param mapAdditionalParams additional parameters
+    ///
+    /// Exceptions: throws if a required parameter is not in map
+    ///
+    virtual void SetParameters(const SPlenCamDescription& descrMLA,
+                               const std::map<std::string,double>& mapAdditionalParams) override
     {
-        m_params = params;
+        m_params.descrMla = descrMLA;
+
+        // Direct parameters settings
+        m_params.fMinDisparity = StdMapTestAndGet(mapAdditionalParams, "Min Disparity");
+        m_params.fMaxDisparity = StdMapTestAndGet(mapAdditionalParams, "Max Disparity");
+        m_params.fMinCurvature = StdMapTestAndGet(mapAdditionalParams, "Min Curvature");
+
+        // Derived parameters
+        // refinement range : two disparity steps before and 2 after initial estimate
+        m_params.fRefinementDisparityRange_px = 4.0f * m_params.descrMla.fMicroLensDistance_px / float(DISPSTEPS_INITIAL)
+                                 * (m_params.fMaxDisparity - m_params.fMinDisparity);
+
+        // non-double parameters
+        m_params.flagRefine = (StdMapTestAndGet(mapAdditionalParams, "Flag Refine") != 0);
     }
 
     ///
@@ -93,7 +114,8 @@ public:
     /// in [px] is normalized with the matched lens' center distance in [px].
     /// Not matched (range checks etc) or removed (e.g. due to min. curvature) are set to 0.
     ///
-    virtual void EstimateDisparities(CVImage_sptr& spDisparties, CVImage_sptr& spWeights, const CVImage_sptr& spPlenopticImage);
+    virtual void EstimateDisparities(CVImage_sptr& spDisparties, CVImage_sptr& spWeights,
+                                     const CVImage_sptr& spPlenopticImage) override;
 
 protected:
     /// Struct containing external parameters for estimation

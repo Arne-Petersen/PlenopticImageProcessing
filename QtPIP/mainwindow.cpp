@@ -1,9 +1,9 @@
 ﻿/**
  * Copyright 2019 Arne Petersen, Kiel University
  *
- *    Permission is hereby granted, free of charge, to any person obtaining a copy of this software and 
+ *    Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
  *    associated documentation files (the "Software"), to deal in the Software without restriction, including
- *    without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or 
+ *    without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
  *    sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject
  *    to the following conditions:
  *
@@ -17,8 +17,13 @@
  *    SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.#pragma once
  */
 
+/// REPLACE WITH YOUR DISPARITY ESTIMATION HEADER
 #include "PIPAlgorithms/CUDA/DisparityEstimation_OFL.hh"
-#include "PIPAlgorithms/CUDA/DisparityCrosscheck.hh"
+/// REPLACE WITH YOUR DISPARITY REFINEMENT HEADER
+#include "PIPAlgorithms/CUDA/DisparityRefinement_Crosscheck.hh"
+/// REPLACE WITH YOUR PROJECTION MAPPING HEADER
+#include "PIPAlgorithms/CUDA/UnprojectFromDisparity_basic.hh"
+
 #include "PIPAlgorithms/CUDA/MicrolensFusion.hh"
 #include "PIPAlgorithms/CUDA/MlaVisualization.hh"
 #include "PIPAlgorithms/CUDA/VignettingNormalization.hh"
@@ -41,8 +46,8 @@
 #define PT_SLIDER_OUTPUT_DISPLACEY "Output Displace Y"
 #define PT_SLIDER_OUTPUT_DISPLACEZ "Output Displace Z"
 
-#define PT_SLIDER_ESTIMATOR_MINCURVE "Min. Curvature"
-#define PT_SLIDER_ESTIMATOR_MAXDISPDELTA "Max. Disp. Difference"
+#define PT_SLIDER_ESTIMATOR_MINCURVE "Min Curvature"
+#define PT_SLIDER_ESTIMATOR_MAXDISPDELTA "Max Disp Difference"
 #define PT_SLIDER_ESTIMATOR_MINDISP "Min Disparity"
 #define PT_SLIDER_ESTIMATOR_MAXDISP "Max Disparity"
 
@@ -59,6 +64,44 @@
 #define PT_SLIDER_MLA_SHIFTY "MLA.shift Y"
 
 using namespace PIP;
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////       CUSTOMIZATION INTERFACE      //////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void QtPlenopticTools::MainWindow::_c_AllocateModules()
+{
+    m_pDisparityEstimator = new CCUDADisparityEstimation_OFL();
+    m_pDisparityRefiner = new CCUDADisparityRefinement_Crosscheck();
+    m_pProjectVirtualToObject = new CCUDAUnprojectFromDisparity_basic();
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+void QtPlenopticTools::MainWindow::_c_AddCustomSliders()
+{
+    // Add label for seperate sections ... (strIdentifier, group label text, tooltip)
+    // m_pSliderWidget->AddGroupLabel("Custom Params", "Custom Parameters", "Section for custom parameters.");
+
+    // If any, insert your custom sliders here. Generated parameter map for algorithms will include
+    // value under same identifier.
+    //
+    // Example :
+    //    m_pSliderWidget->AddSlider( STRINGIDENTIFIER , "some tooltip text", value, min, max, number of ticks);
+    //
+    // If automatic re-compute is needed for new parameter, adopt \ref OnSliderValue_changed accordingly
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+void QtPlenopticTools::MainWindow::_c_GetParameterMap(std::map<std::string,double>& mapParams)
+{
+    // Convert slider widget to string/value mapping
+    m_pSliderWidget->GetValueMap(mapParams);
+
+    // Convert non-double parameters
+    mapParams["Flag Refine"] = ui->checkBox_Refine->isChecked() ? 1.0 : 0;
+
+    // Add cutom controls here, e.g. after creating new checkboxes etc. in GUI
+}
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////   Initialization and destruction   //////////////////////////////////////////////////////////
@@ -90,11 +133,11 @@ QtPlenopticTools::MainWindow::MainWindow(QWidget *parent) :
     QScrollArea* pInnerArea = new QScrollArea();
     m_pWinSliders = new QMainWindow(this);
     m_pWinSliders->setCentralWidget(pInnerArea);
-    m_pWinSliders->resize(600,700);
+    m_pWinSliders->resize(600, 700);
     m_pSliderWidget = new PIP::QtPIP::CQtSliderWidget(pInnerArea);
     m_pSliderWidget->setMinimumWidth(500);
     m_pSliderWidget->setMinimumHeight(500);
-    m_pSliderWidget->setSizePolicy(QSizePolicy::Expanding , QSizePolicy::Expanding );
+    m_pSliderWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding );
     pInnerArea->setWidget(m_pSliderWidget);
     pInnerArea->setWidgetResizable(true);
 
@@ -102,19 +145,19 @@ QtPlenopticTools::MainWindow::MainWindow(QWidget *parent) :
     // ... parameters controling output camera for fusion (all-in-focus and 2.5D depthmap)
     m_pSliderWidget->AddGroupLabel(":0group", "Output Parameters", "");
     m_pSliderWidget->AddSlider(PT_SLIDER_OUTPUT_WIDTH, "width of TF image and 2.5D depthmap",
-                              float(projTarget.vecRes.x), 100, 3000, 2901);
+                               float(projTarget.vecRes.x), 100, 3000, 2901);
     m_pSliderWidget->AddSlider(PT_SLIDER_OUTPUT_HEIGHT, "height of TF image and 2.5D depthmap",
-                              float(projTarget.vecRes.y), 100, 3000, 2901);
+                               float(projTarget.vecRes.y), 100, 3000, 2901);
     m_pSliderWidget->AddSlider(PT_SLIDER_OUTPUT_SENSORWIDTH, "width of sensor [mm] for virtual camera",
-                              20.0f, 1, 100, 1000);
+                               20.0f, 1, 100, 1000);
     m_pSliderWidget->AddSlider(PT_SLIDER_OUTPUT_FLENGTH, "focal length [mm] for virtual camera",
-                              fTargPxSize_mm * projTarget.GetK()(0, 0), 1, 1000, 10000);
+                               fTargPxSize_mm * projTarget.GetK()(0, 0), 1, 1000, 10000);
     m_pSliderWidget->AddSlider(PT_SLIDER_OUTPUT_DISPLACEX, "x-displacement [mm] for virtual camera",
-                              projTarget.mtPose_r_c.t_rl_l.x, -100, 100, 1000);
+                               projTarget.mtPose_r_c.t_rl_l.x, -100, 100, 1000);
     m_pSliderWidget->AddSlider(PT_SLIDER_OUTPUT_DISPLACEY, "y-displacement [mm] for virtual camera",
-                              projTarget.mtPose_r_c.t_rl_l.y, -100, 100, 1000);
+                               projTarget.mtPose_r_c.t_rl_l.y, -100, 100, 1000);
     m_pSliderWidget->AddSlider(PT_SLIDER_OUTPUT_DISPLACEZ, "z-displacement [mm] for virtual camera",
-                              projTarget.mtPose_r_c.t_rl_l.z, -50, 50, 1000);
+                               projTarget.mtPose_r_c.t_rl_l.z, -50, 50, 1000);
     // ... parameters controling raw depth estimation
     m_pSliderWidget->AddGroupLabel(":1group", "Estimator Properties", "");
     m_pSliderWidget->AddSlider(PT_SLIDER_ESTIMATOR_MINCURVE, "minimum curvature for filtering", 0.0, 0.0, 1.0, 100);
@@ -126,27 +169,29 @@ QtPlenopticTools::MainWindow::MainWindow(QWidget *parent) :
     m_descrMLA.fMicroImageDiam_MLDistFrac = 0.95f; // omit outer 5percent of micro images as default
     m_pSliderWidget->AddGroupLabel(":2group", "MLA settings", "description of MLA properties.");
     m_pSliderWidget->AddSlider(PT_SLIDER_MLA_GRIDROT, "Rotation of MLA in [rad] with respect to images x-axis.",
-                              m_descrMLA.fGridRot_rad, -MF_PI/20.0, MF_PI/20.0, 10000);
+                               m_descrMLA.fGridRot_rad, -MF_PI/20.0, MF_PI/20.0, 10000);
     m_pSliderWidget->AddSlider(PT_SLIDER_MLA_MLENSDIST, "Distance between two micro lenses in [px]",
-                              m_descrMLA.fMicroLensDistance_px, 0, 100, 20000);
+                               m_descrMLA.fMicroLensDistance_px, 0, 100, 20000);
     m_pSliderWidget->AddSlider(PT_SLIDER_MLA_MLIMAGESCALE, "Scale between micro lens grid and micro image grid",
-                              m_descrMLA.fMlaImageScale, 0.5, 2, 10000);
+                               m_descrMLA.fMlaImageScale, 0.5, 1.5, 10000);
     m_pSliderWidget->AddSlider(PT_SLIDER_MLA_SENSORDIST, "Distance between MLA and sensor at main lens' principal point [mm]",
-                              m_descrMLA.fMicroLensPrincipalDist_px* m_descrMLA.fPixelsize_mm, 0.0, 5.0, 1000.0);
+                               m_descrMLA.fMicroLensPrincipalDist_px* m_descrMLA.fPixelsize_mm, 0.0, 5.0, 1000.0);
     m_pSliderWidget->AddSlider(PT_SLIDER_MLA_MAINFLEN, "Focal length of main lens [mm]",
-                              m_descrMLA.fMainLensFLength_mm, 0.0, 1000.0, 1000);
+                               m_descrMLA.fMainLensFLength_mm, 0.0, 1000.0, 1000);
     m_pSliderWidget->AddSlider(PT_SLIDER_MLA_MLAMAINLENSDIST, "Distance between main lens projection center and MLA [mm]",
-                              m_descrMLA.mtMlaPose_L_MLA.t_rl_l.z, 0.0, 1000.0, 1000);
+                               m_descrMLA.mtMlaPose_L_MLA.t_rl_l.z, 0.0, 1000.0, 1000);
     m_pSliderWidget->AddSlider(PT_SLIDER_MLA_PXSIZE, "Size of sensor pixels in [mm]",
-                              m_descrMLA.fPixelsize_mm, 0.0, 0.1, 10000);
+                               m_descrMLA.fPixelsize_mm, 0.0, 0.1, 10000);
     m_pSliderWidget->AddSlider(PT_SLIDER_MLA_MAINPRINCPOINTX, "Intersection of main lens optical axis in x-axis and sensor width in sensor fractions.",
-                              0.5, 0, 1, 1000);
+                               0.5, 0, 1, 1000);
     m_pSliderWidget->AddSlider(PT_SLIDER_MLA_MAINPRINCPOINTY, "Intersection of main lens optical axis in x-axis and sensor width in sensor fractions.",
-                              0.5, 0, 1, 1000);
+                               0.5, 0, 1, 1000);
     m_pSliderWidget->AddSlider(PT_SLIDER_MLA_SHIFTX, "Shift in X-axis of MLA center to sensor center in px.",
-                              m_descrMLA.vMlaCenter_px.x, -100, 100, 10000);
+                               m_descrMLA.vMlaCenter_px.x, -100, 100, 10000);
     m_pSliderWidget->AddSlider(PT_SLIDER_MLA_SHIFTY, "Y-axis center of MLA in sensor fractions.",
-                              m_descrMLA.vMlaCenter_px.y, -100, 100, 10000);
+                               m_descrMLA.vMlaCenter_px.y, -100, 100, 10000);
+
+    // ... add additional custom sliders
 
     // Display slider window and put it on top of gui
     m_pWinSliders->show();
@@ -180,12 +225,15 @@ QtPlenopticTools::MainWindow::MainWindow(QWidget *parent) :
     connect(qApp, &QApplication::aboutToQuit, this, &QtPlenopticTools::MainWindow::OnFormExit_triggered);
     connect(ui->actionExit, &QAction::triggered, this, &QtPlenopticTools::MainWindow::OnFormExit_triggered);
 
-//    // For linux platforms CUDA takes some time to allocate first memory slot. Force this here...
-//    _AppendText("Initializing CUDA...");
-//    this->setEnabled(false);
-//    MF_InitializeCUDA();
-//    this->setEnabled(true);
-//    _AppendText("DONE!");
+    //    // For linux platforms CUDA takes some time to allocate first memory slot. Force this here...
+    //    _AppendText("Initializing CUDA...");
+    //    this->setEnabled(false);
+    //    MF_InitializeCUDA();
+    //    this->setEnabled(true);
+    //    _AppendText("DONE!");
+
+    // Allocate estimators using customization interface.
+    _c_AllocateModules();
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -196,7 +244,7 @@ QtPlenopticTools::MainWindow::~MainWindow()
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-void QtPlenopticTools::MainWindow::_UpdateGUI()
+void QtPlenopticTools::MainWindow::_UpdateGUIfromMLA()
 {
     try
     {
@@ -470,7 +518,7 @@ void QtPlenopticTools::MainWindow::OnButton_triggered()
             // Reset MLA according to available raw/vignetting image (if any)
             _ResetMLA();
             // Update slider values in GUI
-            _UpdateGUI();
+            _UpdateGUIfromMLA();
             // Redraw MLA if applicable
             OnSliderValue_changed("", 0);
         }
@@ -500,7 +548,7 @@ void QtPlenopticTools::MainWindow::OnButton_triggered()
             m_descrMLA.fMicroImageDiam_MLDistFrac = 0.95f;
 
             // Update slider values in GUI
-            _UpdateGUI();
+            _UpdateGUIfromMLA();
             // Update MLA visualization if needed
             OnSliderValue_changed("", 0);
         }
@@ -600,6 +648,7 @@ void QtPlenopticTools::MainWindow::_ImportImage(const std::string strFilemame, c
 {
     // Try read plain input image
     CVImage_sptr spImage = std::make_shared<CVImage>();
+
     CDataIO::ImportImage(*spImage, strFilemame);
 
     // ... no throw, image imported successfully
@@ -660,7 +709,7 @@ void QtPlenopticTools::MainWindow::_ImportImage(const std::string strFilemame, c
         if ((m_descrMLA.viSensorRes_px.x != m_spRawImage->cols())||(m_descrMLA.viSensorRes_px.y != m_spRawImage->rows()))
         {
             _ResetMLA();
-            _UpdateGUI();
+            _UpdateGUIfromMLA();
             _AppendText("Image not compatible with loaded MLA, resetting descriptor!");
         }
 
@@ -692,7 +741,7 @@ void QtPlenopticTools::MainWindow::_ImportImage(const std::string strFilemame, c
         {
             // Image not compatible with loaded MLA, reset descriptor
             _ResetMLA();
-            _UpdateGUI();
+            _UpdateGUIfromMLA();
             _AppendText("Image not compatible with loaded MLA, resetting descriptor!");
         }
 
@@ -722,7 +771,7 @@ void QtPlenopticTools::MainWindow::_ImportImage(const std::string strFilemame, c
     }
 
     // Update sliders to MLA calibration part dependent on image resolution
-    _UpdateGUI();
+    _UpdateGUIfromMLA();
 
 }
 
@@ -757,7 +806,7 @@ void QtPlenopticTools::MainWindow::_ResetMLA()
     m_descrMLA.fMicroLensDistance_px = float(width)/200.0f;
     m_descrMLA.fMlaImageScale = 1.0f;
     m_descrMLA.vMlaCenter_px.Set(0.5f * (m_descrMLA.viSensorRes_px.x-1),
-                                    0.5f * (m_descrMLA.viSensorRes_px.y-1));
+                                 0.5f * (m_descrMLA.viSensorRes_px.y-1));
     m_descrMLA.vfMainPrincipalPoint_px = 0.5f * vec2<float>(m_descrMLA.viSensorRes_px);
     m_descrMLA.fMainLensFLength_mm = 100;
     m_descrMLA.mtMlaPose_L_MLA.t_rl_l.z = 123;
@@ -794,16 +843,11 @@ void QtPlenopticTools::MainWindow::_ComputeDepth()
         CVImage_sptr spDispImage(new CVImage(m_spWorkRawImage->cols(), m_spWorkRawImage->rows(), CV_32FC1, EImageType::GRAYDEPTH));
         CVImage_sptr spWeightImage(new CVImage(m_spWorkRawImage->cols(), m_spWorkRawImage->rows(), CV_32FC1, EImageType::GRAYDEPTH));
         // Set disparity estimation parameters
-        SParamsDisparityEstimation_OFL params;
-        params.descrMla = m_descrMLA;
-        params.flagRefine = ui->checkBox_Refine->isChecked();
-        params.fMinCurvature = m_pSliderWidget->GetValue(PT_SLIDER_ESTIMATOR_MINCURVE);
-        params.fDispRange_px = 4.0f * m_descrMLA.fMicroLensDistance_px
-                               * float(CCUDADisparityEstimation_OFL_DNORMALIZED_MAX - CCUDADisparityEstimation_OFL_DNORMALIZED_MIN) / float(DISPSTEPS_INITIAL);
+        std::map<std::string,double> mapParams;
+        _c_GetParameterMap(mapParams);
+        m_pDisparityEstimator->SetParameters(m_descrMLA, mapParams);
         // Apply disparity estimation to raw-image member (normalized with vignetting image if available)
-        CCUDADisparityEstimation_OFL cudaEstimator;
-        cudaEstimator.SetParameters(params);
-        cudaEstimator.EstimateDisparities(spDispImage, spWeightImage, m_spWorkRawImage);
+        m_pDisparityEstimator->EstimateDisparities(spDispImage, spWeightImage, m_spWorkRawImage);
 
         // Clone new depthmap to member (create if neccessary)
         if (m_spLFDepthMap == nullptr)
@@ -827,13 +871,16 @@ void QtPlenopticTools::MainWindow::_ComputeFusion()
         return;
     }
 
+    // get active global parameter map
+    std::map<std::string,double> mapParams;
+    _c_GetParameterMap(mapParams);
+
     // create filtered version of depthmap (if requested)
     CVImage_sptr spDispImage(new CVImage(m_spLFDepthMap->cols(), m_spLFDepthMap->rows(), CV_32FC1, EImageType::GRAYDEPTH));
     if (ui->checkBox_CrossCheck->isChecked() == true)
     {
-        CCUDADisparityCrosscheck::Estimate(spDispImage, m_spLFDepthMap,
-                                           m_descrMLA,
-                                           m_pSliderWidget->GetValue(PT_SLIDER_ESTIMATOR_MAXDISPDELTA));
+        m_pDisparityRefiner->SetParameters(m_descrMLA, mapParams);
+        m_pDisparityRefiner->RefineDisparities(spDispImage, m_spLFDepthMap);
     }
     else
     {
@@ -874,10 +921,15 @@ void QtPlenopticTools::MainWindow::_ComputeFusion()
                                    outFLen / projTarget.fPixelsize_mm,
                                    0, vfFusedImagePrincipalPoint);
 
-    CCUDAMicrolensFusion::Unproject(m_spRawPoints3D, m_spRawPointColors, m_spDepth2D, m_spAllInFocus,
-                                    spDispImage, m_spWorkRawImage, m_descrMLA, projTarget,
-                                    m_pSliderWidget->GetValue(PT_SLIDER_ESTIMATOR_MINDISP),
-                                    m_pSliderWidget->GetValue(PT_SLIDER_ESTIMATOR_MAXDISP));
+    // Transfer active parameters to projection module and start CUDA module
+    m_pProjectVirtualToObject->SetParameters(m_descrMLA, projTarget, mapParams);
+    m_pProjectVirtualToObject->UnprojectDisparities(m_spRawPoints3D, m_spRawPointColors, m_spDepth2D, m_spAllInFocus,
+                                                    spDispImage, m_spWorkRawImage);
+
+    //    CCUDAMicrolensFusion::Unproject(m_spRawPoints3D, m_spRawPointColors, m_spDepth2D, m_spAllInFocus,
+    //                                    spDispImage, m_spWorkRawImage, m_descrMLA, projTarget,
+    //                                    m_pSliderWidget->GetValue(PT_SLIDER_ESTIMATOR_MINDISP),
+    //                                    m_pSliderWidget->GetValue(PT_SLIDER_ESTIMATOR_MAXDISP));
 
     // Apply filling with median filter if requested
     if (ui->checkBox_MedFilt2D->isChecked())
@@ -886,9 +938,6 @@ void QtPlenopticTools::MainWindow::_ComputeFusion()
         CCUDAMicrolensFusion::MedianFill<5>(m_spDepth2D, false);
         // Apply 3x3 median-fill + smoothing on 2.5D depthmap
         CCUDAMicrolensFusion::MedianFill<1>(m_spDepth2D, true);
-        //cv::Mat temp;
-        //cv::bilateralFilter(m_spDepth2D->CvMat(), temp, 3, 5, 5);
-        //m_spDepth2D->CvMat() = temp;
     }
 
     CCUDAMicrolensFusion::ImageSynthesis<unsigned char>(m_spAllInFocus, m_spDepth2D, m_spWorkRawImage,
@@ -987,7 +1036,6 @@ void QtPlenopticTools::MainWindow::_ExportImages(const std::string& strFilenameB
             spTempMap->CvMat() = 1.0/(dMax-dMin) * (m_spDepth2D->CvMat() - dMin);
             spTempMap->CvMat() *= 255.0;
             spTempMap->CvMat().convertTo(spTempMap->CvMat(), CV_8UC1);
-            //spTempMap->Clone(*spTempMap_);
             cv::applyColorMap(spTempMap->CvMat(), spTempMap->CvMat(), cv::COLORMAP_PARULA);
             //cv::applyColorMap(spTempMap->CvMat(), spTempMap->CvMat(), cv::COLORMAP_JET);
             // Get RGB version of image
@@ -1025,9 +1073,11 @@ void QtPlenopticTools::MainWindow::_ExportImages(const std::string& strFilenameB
         // create filtered version of depthmap if requested
         CVImage_sptr spExportImage(new CVImage(m_spLFDepthMap->cols(), m_spLFDepthMap->rows(), CV_32FC1, EImageType::GRAYDEPTH));
         if (ui->checkBox_CrossCheck->isChecked() == true)
-        {
-            CCUDADisparityCrosscheck::Estimate(spExportImage, m_spLFDepthMap,
-                                               m_descrMLA, m_pSliderWidget->GetValue(PT_SLIDER_ESTIMATOR_MAXDISPDELTA));
+        {            
+            std::map<std::string,double> mapParams;
+            _c_GetParameterMap(mapParams);
+            m_pDisparityRefiner->SetParameters(m_descrMLA, mapParams);
+            m_pDisparityRefiner->RefineDisparities(spExportImage, m_spLFDepthMap);
         }
         else
         {
@@ -1204,9 +1254,10 @@ void QtPlenopticTools::MainWindow::_DisplayColoredDepth()
     CVImage_sptr spDispImage(new CVImage(m_spLFDepthMap->cols(), m_spLFDepthMap->rows(), CV_32FC1, EImageType::GRAYDEPTH));
     if (ui->checkBox_CrossCheck->isChecked() == true)
     {
-        CCUDADisparityCrosscheck::Estimate(spDispImage, m_spLFDepthMap,
-                                           m_descrMLA,
-                                           m_pSliderWidget->GetValue(PT_SLIDER_ESTIMATOR_MAXDISPDELTA));
+        std::map<std::string,double> mapParams;
+        _c_GetParameterMap(mapParams);
+        m_pDisparityRefiner->SetParameters(m_descrMLA, mapParams);
+        m_pDisparityRefiner->RefineDisparities(spDispImage, m_spLFDepthMap);
     }
     else
     {
@@ -1253,7 +1304,8 @@ void QtPlenopticTools::MainWindow::_UpdateWorkImages(const bool flagDrawImages)
         if (m_spRawImage != nullptr)
         {
             m_spWorkRawImage = CVImage_sptr(new CVImage(m_spRawImage->GetImageDataDescriptor()));
-            CVignettingNormalization_CUDA::NormalizeImage(m_spWorkRawImage, m_spRawImage, m_spVignettingImage, 1.0f, m_descrMLA);// 0.9f);//0.7f);
+            CVignettingNormalization_CUDA::NormalizeImage(m_spWorkRawImage, m_spRawImage, m_spVignettingImage,
+                                                          1.0f, m_descrMLA);
             _AppendText("OnImageSent : Applied de-vignetting to raw input image.");
 
             // Convert ALL work images to RGBA (apply debayering if needed)
@@ -1267,10 +1319,6 @@ void QtPlenopticTools::MainWindow::_UpdateWorkImages(const bool flagDrawImages)
         m_spWorkRawImage = CVImage_sptr(new CVImage());
         // Convert ALL work images to RGBA (apply debayering if needed)
         CDataIO::ImageToRGBA(*m_spWorkRawImage, *m_spRawImage);
-
-        //cv::cvtColor(m_spWorkRawImage->CvMat(), m_spWorkRawImage->CvMat(), cv::COLOR_RGBA2GRAY);
-        //m_spWorkRawImage->descrMetaData.eImageType = EImageType::MONO;
-        //CDataIO::ImageToRGBA(*m_spWorkRawImage, *m_spWorkRawImage);
     }
 
 

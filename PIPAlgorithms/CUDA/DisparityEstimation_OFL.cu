@@ -59,7 +59,7 @@ struct SCudaParams
     {
         fMinDisparity = paramsIn.fMinCurvature;
         fMaxDisparity = paramsIn.fMaxDisparity;
-        fDispRange_px = paramsIn.fDispRange_px;
+        fDispRange_px = paramsIn.fRefinementDisparityRange_px;
         fMinCurvature = paramsIn.fMinCurvature;
         p1f = paramsIn.p1f;
         p2f = paramsIn.p2f;

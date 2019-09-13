@@ -328,7 +328,7 @@ public:
     {
         const vec3<T> vecDir = this->UnprojectDirection(vecPix);
 
-        return (tZDist / vecDir.z) * vecDir + this->UnprojectOrigin();
+        return tZDist * vecDir + this->UnprojectOrigin();
     }
 
     ///

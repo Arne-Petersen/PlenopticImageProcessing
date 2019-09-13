@@ -28,37 +28,15 @@
 PIP::QtPIP::CQtSliderWidget::CQtSliderWidget(QWidget* pParent)
     : QScrollArea(pParent)
 {
-    //    QScrollArea *posts = new QScrollArea();
-    //    posts->setWidgetResizable(true);
-    //    posts->setSizePolicy(  new QSizePolicy(QSizePolicy::Policy::Expanding) );
-    //    posts->setFrameShape(QFrame::NoFrame);
-
-    //    // Generate horizontal layout
-    //    QGridLayout* pLayout = new QGridLayout(posts);
-
-    //    QVBoxLayout *postsLayout = new QVBoxLayout(posts);
-    //    for (int i = 0; i < 50; i++) {
-    //    QLabel *label = new QLabel(tr("some sample label"));
-    //    pLayout->addWidget(label);
-
-    //    this->setMinimumHeight(500);
-    //    this->setMinimumWidth(250);
-
     QGridLayout* pLayout = new QGridLayout(this);
-    //pLayout->setSizeConstraint( QLayout::SizeConstraint::SetMinimumSize );
-    //    QFrame *pInnerFrame = new QFrame(this);
-    //    pLayout->addWidget(pInnerFrame);
-
     // Set layout to this widget
     this->setLayout(pLayout);
-
-    //this->setWidgetResizable(true);
 }
 
+///////////////////////////////////////////////////////////////////////////////////////////////
 void PIP::QtPIP::CQtSliderWidget::AddGroupLabel(const std::string &strIdentifier,
         const std::string &strLabel, const std::string &strToolTip)
 {
-    //
     if (m_mapIdentifierToIndices.find(strIdentifier) != m_mapIdentifierToIndices.end())
     {
         throw CRuntimeException("CQtSliderWidget::AddGroupLabel : Identifier already used.",
@@ -175,6 +153,36 @@ void PIP::QtPIP::CQtSliderWidget::AddSlider(const std::string& strIdentifier, co
     m_vecLabelsRange.push_back(pLabelRange);
     m_vecSliders.push_back(pSlider);
     m_vecLabelsName.push_back(pLabelName);
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////
+void PIP::QtPIP::CQtSliderWidget::Clear()
+{
+    // Free allocated layout
+    delete this->layout();
+    // Remove all items from parenting and free
+    qDeleteAll(this->children());
+    // Generate new layout
+    this->setLayout(new QGridLayout());
+    // Reset internal structures
+    m_vecMinima.clear();
+    m_vecMaxima.clear();
+    m_vecNumSteps.clear();
+    m_mapIdentifierToIndices.clear();
+    m_vecLabelsValue.clear();
+    m_vecSliders.clear();
+    m_vecLabelsName.clear();
+    m_vecLabelsRange.clear();
+    m_vecCheckBoxes.clear();
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////
+void PIP::QtPIP::CQtSliderWidget::GetValueMap(std::map<std::string, double>& mapIdentifiersToValues)
+{
+    for (auto itIdMap = m_mapIdentifierToIndices.begin(); itIdMap != m_mapIdentifierToIndices.end(); ++itIdMap)
+    {
+        mapIdentifiersToValues[itIdMap->first] = _GetValue(itIdMap->second);
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
@@ -318,27 +326,6 @@ void PIP::QtPIP::CQtSliderWidget::SetEnabled(const std::string& strIdentifier, c
     if (pLabelValue != nullptr) pLabelValue->setEnabled(flagEnabled);
     if (pLabelRange != nullptr) pLabelRange->setEnabled(flagEnabled);
     if (pCheckBox != nullptr) pLabelRange->setEnabled(flagEnabled);
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////////
-void PIP::QtPIP::CQtSliderWidget::Clear()
-{
-    // Free allocated layout
-    delete this->layout();
-    // Remove all items from parenting and free
-    qDeleteAll(this->children());
-    // Generate new layout
-    this->setLayout(new QGridLayout());
-    // Reset internal structures
-    m_vecMinima.clear();
-    m_vecMaxima.clear();
-    m_vecNumSteps.clear();
-    m_mapIdentifierToIndices.clear();
-    m_vecLabelsValue.clear();
-    m_vecSliders.clear();
-    m_vecLabelsName.clear();
-    m_vecLabelsRange.clear();
-    m_vecCheckBoxes.clear();
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////

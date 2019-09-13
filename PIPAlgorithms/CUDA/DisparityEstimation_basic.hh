@@ -54,9 +54,22 @@ public:
     CCUDADisparityEstimation_basic() {}
     virtual ~CCUDADisparityEstimation_basic() {}
 
-    virtual void SetParameters(const SParamsDisparityEstimation_basic& params)
+    ///
+    /// \brief SetParameters provides MLA description and additional parameters to this.
+    /// \param descrMLA description of MLA
+    /// \param mapAdditionalParams additional parameters
+    ///
+    /// Exceptions: throws if a required parameter is not in map
+    ///
+    virtual void SetParameters(const SPlenCamDescription& descrMLA,
+                               const std::map<std::string,double>& mapAdditionalParams) override
     {
-        m_params = params;
+        m_params.descrMla = descrMLA;
+
+        // Direct parameters settings
+        m_params.fMinDisparity = StdMapTestAndGet(mapAdditionalParams, "Min Disparity");
+        m_params.fMaxDisparity = StdMapTestAndGet(mapAdditionalParams, "Max Disparity");
+        m_params.fMinCurvature = StdMapTestAndGet(mapAdditionalParams, "Min Curvature");
     }
 
     ///
@@ -69,7 +82,8 @@ public:
     /// in [px] is normalized with the lens baseline in [px].
     /// Not matched (range checks etc) or removed (e.g. due to min. curvature) are set to 0.
     ///
-    virtual void EstimateDisparities(CVImage_sptr& spDisparties, CVImage_sptr& spWeights, const CVImage_sptr& spPlenopticImage);
+    virtual void EstimateDisparities(CVImage_sptr& spDisparties, CVImage_sptr& spWeights,
+                                     const CVImage_sptr& spPlenopticImage);
 
 protected:
     /// Struct containing external parameters for estimation

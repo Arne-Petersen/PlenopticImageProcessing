@@ -14,7 +14,7 @@
  *    LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
  *    NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
  *    WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
- *    SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.#pragma once
+ *    SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
 #pragma once
@@ -23,8 +23,7 @@
 
 #include "QtSliderWidget.hh"
 
-#include "PIPBase/PlenopticTypes.hh"
-#include "PIPBase/CVImage.hh"
+#include "PIPAlgorithms/AlgorithmInterfaces.hh"
 
 // Forward declarations of UI moc classes
 namespace Ui {
@@ -147,7 +146,7 @@ private:
     ///
     /// \brief _UpdateGUI sets all button/slider values to be consistent with active configuration
     ///
-    void _UpdateGUI();
+    void _UpdateGUIfromMLA();
 
     ///
     /// \brief _ResetMLA sets MLA descriptor to default values
@@ -184,9 +183,52 @@ private:
     /// Structure defining properties of used MLA, if of hexagonal type
     PIP::SPlenCamDescription m_descrMLA;
 
-    ///
+    /// Window for parameter sliders
     QMainWindow* m_pWinSliders = nullptr;
+    /// Widget for parameter sliders hold by \ref m_pWinSliders
     PIP::QtPIP::CQtSliderWidget* m_pSliderWidget = nullptr;
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////////
+    ///                 Estimators and custom parameter generation methods                          ///
+    ///////////////////////////////////////////////////////////////////////////////////////////////////
+
+    ///
+    /// \brief _c_AllocateModules allocates esimator instances
+    ///
+    /// Use this to replace default estimators by your customs
+    ///
+    void _c_AllocateModules();
+
+    ///
+    /// \brief _c_AddCustomSliders used to append custom parameter sliders to GUI
+    ///
+    /// Use this to add new sliders to the slider dialog
+    ///
+    void _c_AddCustomSliders();
+
+    ///
+    /// \brief _c_GetParameterMap transforms parameters from GUI to string/value mapping
+    /// \param mapParams in/out ID/value mapping
+    ///
+    /// Use this to implement logic for converting non-double parameters to doubles in parmap
+    ///
+    void _c_GetParameterMap(std::map<std::string,double>& mapParams);
+
+    ///
+    /// \brief m_pDisparityEstimator estimator instance for disparity estimation
+    ///
+    IDisparityEstimation* m_pDisparityEstimator = nullptr;
+
+    ///
+    /// \brief m_pDisparityRefiner disparity refiner instance for post process (crosscheck etc.)
+    ///
+    IDisparityRefinement* m_pDisparityRefiner = nullptr;
+
+    ///
+    /// \brief m_pProjectVirtualToObject module for projecting raw disparity maps to object space
+    ///        and 2.5D depthmaps
+    ///
+    IUnprojectFromDisparity* m_pProjectVirtualToObject = nullptr;
 };
 
 }

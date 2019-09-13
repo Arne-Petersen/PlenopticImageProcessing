@@ -56,8 +56,12 @@ public:
     ///
     CQtSliderWidget(QWidget* pParent = nullptr);
 
-    void AddCheckBox(const std::string& strIdentifier, bool flagChecked);
-
+    ///
+    /// \brief AddGroupLabel adds a text label in place of a slider for grouping
+    /// \param strIdentifier labels key
+    /// \param strLabel labels text
+    /// \param strToolTip labels tooltip
+    ///
     void AddGroupLabel(const std::string& strIdentifier, const std::string& strLabel,
                        const std::string& strToolTip);
 
@@ -85,6 +89,12 @@ public:
     /// \brief Clear removes all slider from this and frees resources
     ///
     void Clear();
+
+    ///
+    /// \brief GetValueMap !appends/overwrites! identifier/value pairs to/in given map
+    /// \param mapIdentifiersToValues in/out ID-value mapping
+    ///
+    void GetValueMap(std::map<std::string, double>& mapIdentifiersToValues);
 
     ///
     /// \brief ModifySlider allows to change label, tooltip and numerical properties of
@@ -135,7 +145,8 @@ public:
     void SetValue(const std::string& strIdentifier, const double dblValue, const bool flagQuiet = false);
 
     ///
-    /// \brief GetValue returns actual double value of slider, throws for invalid \ref strIdentifier
+    /// \brief GetValue returns actual double value of slider, NaN for group labels,
+    ///                 throws for invalid \ref strIdentifier
     /// \param strIdentifier label of target slider
     /// \return slider value
     ///
@@ -174,7 +185,6 @@ public:
             }
         }
     }
-
 
 signals:
     ///
@@ -220,7 +230,7 @@ public slots:
 protected:
 
     ///
-    /// \brief GetValue returns actual double value of slider
+    /// \brief GetValue returns actual double value of slider, NaN for group labels
     /// \return slider value
     ///
     inline double _GetValue(const unsigned nSliderIndex) const
@@ -229,6 +239,10 @@ protected:
         {
             throw CRuntimeException("Given slider index is out of range", ERuntimeExcpetionType::ILLEGAL_ARGUMENT);
         }
+
+        // return NaN for group label indices
+        if (m_vecSliders[nSliderIndex] == nullptr)
+            return std::numeric_limits<double>::quiet_NaN();
 
         return _ConvertToDoubleValue(m_vecSliders[nSliderIndex]->value(), m_vecMinima[nSliderIndex],
                                      m_vecMaxima[nSliderIndex], m_vecNumSteps[nSliderIndex]);
