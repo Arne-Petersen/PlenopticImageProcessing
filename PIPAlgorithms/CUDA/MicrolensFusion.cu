@@ -232,16 +232,6 @@ __global__ void computeImageSynthesis(OUTPUTSTORAGETYPE* outputSynthImage,
     vec2<float> vRawLfPix_px;
     vRawLfPix_px = globalParams.descrMla.GetMicrocamProjection<t_eGridType>(vMLensIndex).Project(vVirtualPos3D_MM);
 
-    if ((vPixelPos_px.x == 200)&&(vPixelPos_px.y == 200))
-    {
-        printf("DL : %g\n", globalParams.descrMla.mtMlaPose_L_MLA.t_rl_l.z);
-        printf("DM : %g\n", globalParams.descrMla.fPixelsize_mm * globalParams.descrMla.fMicroLensPrincipalDist_px);
-        printf("Xz : %g\n", vVirtualPos3D_MM.z);
-        //printf("S/A : %g / %g = %g\n", fMlaConvergeDistMla, fMlaConvergeDistVpos, fMlaConvergeDistMla/fMlaConvergeDistVpos);
-        printf("vp : [%g ; %g]\n", vPos2D_px.x, vPos2D_px.y);
-        printf("vr : [%g ; %g]\n", vRawLfPix_px.x, vRawLfPix_px.y);
-    }
-
     // If pixel is too far from lens center, skip
     if ((vRawLfPix_px - globalParams.descrMla.GetMicroImageCenter_px<t_eGridType>(vMLensIndex)).length()
             > 0.495f*globalParams.descrMla.fMicroLensDistance_px)
