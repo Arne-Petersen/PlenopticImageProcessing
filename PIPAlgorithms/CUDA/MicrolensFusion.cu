@@ -75,10 +75,10 @@ __global__ void computeUnproject(float* outputPoints3D, float* outputPointColors
     // get pinhole properties of micro camera relative to main lens
     PIP::MTCamProjection<float> projMicroLens = globalParams.descrMla.GetMicrocamProjection<t_eGridType>(vGridIndex);
     // 3-space position relative to main lens in mm
-//    vec3<float> vPos3D = projMicroLens.Unproject(vPixelPos_px,
-//                                                 globalParams.descrMla.fMicroLensPrincipalDist_px * globalParams.descrMla.fPixelsize_mm / fDisparity_baselines);
     vec3<float> vPos3D = projMicroLens.Unproject(vPixelPos_px,
-                                                 globalParams.descrMla.fMicroLensDistance_px * globalParams.descrMla.fPixelsize_mm / fDisparity_baselines);
+                                                 globalParams.descrMla.fMicroLensPrincipalDist_px * globalParams.descrMla.fPixelsize_mm / fDisparity_baselines);
+//    vec3<float> vPos3D = projMicroLens.Unproject(vPixelPos_px,
+//                                                 globalParams.descrMla.fMicroLensDistance_px * globalParams.descrMla.fPixelsize_mm / fDisparity_baselines);
 
     // project point through mainlens.
     vPos3D = MapThinLens(globalParams.descrMla.fMainLensFLength_mm, vPos3D);
@@ -182,13 +182,15 @@ __global__ void computeImageSynthesis(OUTPUTSTORAGETYPE* outputSynthImage,
 {
     // Get pixel position and test 'in image'
     vec2<float> vPixelPos_px;
-    vPixelPos_px.Set(blockIdx.x*blockDim.x + threadIdx.x, blockIdx.y*blockDim.y + threadIdx.y);
+    vPixelPos_px.Set(float(blockIdx.x*blockDim.x + threadIdx.x), float(blockIdx.y*blockDim.y + threadIdx.y));
 
     // reject out of bounds pixels
     if ((vPixelPos_px.x < 0) || (vPixelPos_px.y < 0)
         || (vPixelPos_px.x > float(globalParams.projTarget.vecRes.x-1))
         || (vPixelPos_px.y > float(globalParams.projTarget.vecRes.y-1)))
+    {
         return;
+    }
 
     // Depth from 2.5D depthmap corresponding to \ref globalParams.projTarget
     float fDepthMM = tex2D<float>(texInputDepth2D, vPixelPos_px.x + 0.5f, vPixelPos_px.y + 0.5f);
@@ -207,42 +209,24 @@ __global__ void computeImageSynthesis(OUTPUTSTORAGETYPE* outputSynthImage,
     vPos2D_px.Set( 1.0f / globalParams.descrMla.fPixelsize_mm * vVirtualPos3D_MM.x,
                    1.0f / globalParams.descrMla.fPixelsize_mm * vVirtualPos3D_MM.y );
 
+    // Find lens with micro image containing 3D points' image. Use ML distance and MLA scale for
     const float temp = (vVirtualPos3D_MM.z - globalParams.descrMla.mtMlaPose_L_MLA.t_rl_l.z) * (globalParams.descrMla.fMlaImageScale - 1.0f)
             + globalParams.descrMla.fPixelsize_mm * globalParams.descrMla.fMicroLensPrincipalDist_px;
-
     vPos2D_px = globalParams.descrMla.fPixelsize_mm * globalParams.descrMla.fMicroLensPrincipalDist_px / temp * vPos2D_px;
 
-    //    const float fMlaConvergeDistVpos = -1.0f/(1.0f - globalParams.descrMla.fMlaImageScale) * globalParams.descrMla.fPixelsize_mm * globalParams.descrMla.fMicroLensPrincipalDist_px
-    //            + vVirtualPos3D_MM.z;
-    //    const float fMlaConvergeDistMla = -1.0f/(1.0f - globalParams.descrMla.fMlaImageScale) * globalParams.descrMla.fPixelsize_mm * globalParams.descrMla.fMicroLensPrincipalDist_px
-    //            + globalParams.descrMla.mtMlaPose_L_MLA.t_rl_l.z;
-    //    vPos2D_px *= fMlaConvergeDistMla/fMlaConvergeDistVpos;
-
-    // Compenstate scale due to perspective imaging of MLs.
-    // vPos2D_px *= (globalParams.descrMla.mtMlaPose_L_MLA.t_rl_l.z + globalParams.descrMla.fPixelsize_mm * globalParams.descrMla.fMicroLensPrincipalDist_px) / vVirtualPos3D_MM.z;
-    // vPos2D_px *= 1.0f / globalParams.descrMla.fMlaImageScale;
     // Relate position to top left of image
     vPos2D_px.x += globalParams.descrMla.vfMainPrincipalPoint_px.x;
     vPos2D_px.y += globalParams.descrMla.vfMainPrincipalPoint_px.y;
     // -> get closest lens index
     vec2<float> vMLensIndex = globalParams.descrMla.GridRound<t_eGridType>(globalParams.descrMla.PixelToLensCenterGrid<t_eGridType>(vPos2D_px));
-    //vec2<float> vMLensIndex = globalParams.descrMla.GridRound<t_eGridType>(globalParams.descrMla.PixelToLensImageGrid<t_eGridType>(vPos2D_px));
 
     // Project virtual position to raw image using micro lens projection
     vec2<float> vRawLfPix_px;
     vRawLfPix_px = globalParams.descrMla.GetMicrocamProjection<t_eGridType>(vMLensIndex).Project(vVirtualPos3D_MM);
 
-    // If pixel is too far from lens center, skip
-    if ((vRawLfPix_px - globalParams.descrMla.GetMicroImageCenter_px<t_eGridType>(vMLensIndex)).length()
-            > 0.495f*globalParams.descrMla.fMicroLensDistance_px)
-    {
-        return;
-    }
-
     // if image is out of bounds, skip
-    if ((vRawLfPix_px.x < 0)||(vRawLfPix_px.y < 0)
-        || (vRawLfPix_px.x > globalParams.vLowerRight.x-globalParams.vUpperLeft.x)
-        || (vRawLfPix_px.y > globalParams.vLowerRight.y-globalParams.vUpperLeft.y))
+    if ((vRawLfPix_px.x < float(globalParams.vUpperLeft.x)) || (vRawLfPix_px.y < float(globalParams.vUpperLeft.y))
+        || (vRawLfPix_px.x > float(globalParams.vLowerRight.x)) || (vRawLfPix_px.y > float(globalParams.vLowerRight.y)))
     {
         return;
     }
@@ -251,8 +235,8 @@ __global__ void computeImageSynthesis(OUTPUTSTORAGETYPE* outputSynthImage,
     float4 vlCol = make_float4(0, 0, 0, 0);
     // Add color from center lens
     // If pixel is too far from lens center, skip
-//    if ((vRawLfPix_px - globalParams.descrMla.GetMicroImageCenter_px<t_eGridType>(vMLensIndex)).length()
-//            < 0.495f*globalParams.descrMla.fMicroLensDistance_px)
+    if ((vRawLfPix_px - globalParams.descrMla.GetMicroImageCenter_px<t_eGridType>(vMLensIndex)).length()
+            < (0.5f*globalParams.descrMla.fMicroImageDiam_MLDistFrac*globalParams.descrMla.fMicroLensDistance_px))
     {
         const float4 vlRCol = getRGBAcolor<t_intChannels>(vRawLfPix_px, texInputPlenopticImage);
         vlCol.x += vlRCol.w * vlRCol.x;
@@ -270,25 +254,24 @@ __global__ void computeImageSynthesis(OUTPUTSTORAGETYPE* outputSynthImage,
         // Get projection to micro image
         vRawLfPix_px = globalParams.descrMla.GetMicrocamProjection<t_eGridType>(vfTargetLensIndex).Project(vVirtualPos3D_MM);
         // Reject pixel if out-of-lens border
-        if ((vRawLfPix_px - globalParams.descrMla.GetMicroImageCenter_px<t_eGridType>(vfTargetLensIndex)).length() > 0.495f*globalParams.descrMla.fMicroLensDistance_px)
-        {
-            continue;
-        }
+        const float fIsIn = float((vRawLfPix_px - globalParams.descrMla.GetMicroImageCenter_px<t_eGridType>(vfTargetLensIndex)).length()
+                                  < (0.5f*globalParams.descrMla.fMicroImageDiam_MLDistFrac*globalParams.descrMla.fMicroLensDistance_px));
         // Read color and add to weighted average
         const float4 vlRCol = getRGBAcolor<t_intChannels>(vRawLfPix_px, texInputPlenopticImage);
-        vlCol.x += vlRCol.w * vlRCol.x;
-        vlCol.y += vlRCol.w * vlRCol.y;
-        vlCol.z += vlRCol.w * vlRCol.z;
-        vlCol.w += vlRCol.w;
+        vlCol.x += fIsIn * vlRCol.w * vlRCol.x;
+        vlCol.y += fIsIn * vlRCol.w * vlRCol.y;
+        vlCol.z += fIsIn * vlRCol.w * vlRCol.z;
+        vlCol.w += fIsIn * vlRCol.w;
     }
 
     // get index in pixel array (output always four channel RGBA)
-    int index = 4 * (int(vPixelPos_px.y) * globalParams.projTarget.vecRes.x + int(vPixelPos_px.x));
+    int index = 4 * ((blockIdx.y*blockDim.y + threadIdx.y) * globalParams.projTarget.vecRes.x + (blockIdx.x*blockDim.x + threadIdx.x));
     // Copy generated color value to all channels, set alpha channel (use aas weights in input)
-    outputSynthImage[index + 0] = fOutputTypeScale*vlCol.x / vlCol.w;
-    outputSynthImage[index + 1] = fOutputTypeScale*vlCol.y / vlCol.w;
-    outputSynthImage[index + 2] = fOutputTypeScale*vlCol.z / vlCol.w;
-    outputSynthImage[index + 3] = fOutputTypeScale*1.0f;
+    vlCol.w = (vlCol.w == 0) ? 1.0f : vlCol.w;
+    outputSynthImage[index + 0] = (OUTPUTSTORAGETYPE)(fOutputTypeScale*(vlCol.x / vlCol.w));
+    outputSynthImage[index + 1] = (OUTPUTSTORAGETYPE)(fOutputTypeScale*(vlCol.y / vlCol.w));
+    outputSynthImage[index + 2] = (OUTPUTSTORAGETYPE)(fOutputTypeScale*(vlCol.z / vlCol.w));
+    outputSynthImage[index + 3] = (OUTPUTSTORAGETYPE)(fOutputTypeScale);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -632,6 +615,9 @@ void CCUDAMicrolensFusion::ImageSynthesis(CVImage_sptr &spSynthImage, const CVIm
     float fOutputTypeScale = 1.0f;
     if (spSynthImage->type() != CV_32FC4)
         fOutputTypeScale = std::numeric_limits<OUTPUTSTORAGETYPE>::max();
+
+    // Wait for everything is upload. Should be done by CUDA, some version are buggy...
+    cudaDeviceSynchronize();
 
     if (spPlenopticImage->CvMat().channels() == 1)
     {

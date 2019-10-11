@@ -108,7 +108,7 @@ public:
                                       " given image size/type differs from texture size/type.");
         }
         // Copy image data to cuda device array
-        cudaMemcpyToArray(m_dpImageArray, 0, 0, (void *) spImage->data(), spImage->bytecount(), cudaMemcpyHostToDevice);
+        cudaMemcpy ( m_dpImageArray, (void *) spImage->data(), spImage->bytecount(), cudaMemcpyHostToDevice);
         cudaError_t e;
         if ((e = cudaGetLastError()) != 0)
         {
@@ -211,22 +211,13 @@ protected:
                                                  8*intBytesChannel34, 8*intBytesChannel34,
                                                  cCFK);
         // Allocate cuda device array to bind to texture
-        cudaMallocArray(&m_dpImageArray, &m_descCudaFormat, spImage->cols(), spImage->rows());
+        cudaMallocArray(&m_dpImageArray, &m_descCudaFormat, size_t(spImage->cols()), size_t(spImage->rows()) );
         cudaError_t e;
         if ((e = cudaGetLastError()) != 0)
         {
             m_dpImageArray = nullptr;
             throw CRuntimeException(std::string("PIP::CCUDAImageTexture : CUDA image malloc error : \"")
                                       + std::string(cudaGetErrorString(e)) + std::string("\""));
-        }
-
-        // Copy image data to cuda device array
-        cudaMemcpyToArray(m_dpImageArray, 0, 0, (void *) spImage->data(), spImage->bytecount(), cudaMemcpyHostToDevice);
-        if ((e = cudaGetLastError()) != 0)
-        {
-            cudaFreeArray(m_dpImageArray);
-            m_dpImageArray = nullptr;
-            throw CRuntimeException(std::string("PIP::CCUDAImageTexture : CUDA image copy error : \"") + std::string(cudaGetErrorString(e)) + std::string("\""));
         }
 
         // Specify texture resource
@@ -243,16 +234,8 @@ protected:
         descTexture.addressMode[0]   = cudaAddressModeClamp;
         descTexture.addressMode[1]   = cudaAddressModeClamp;
         descTexture.filterMode       = cudaFilterModeLinear;
-        descTexture.normalizedCoords = 0;
-
-        if (flagReadNormalized)
-        {
-            descTexture.readMode         = cudaReadModeNormalizedFloat;
-        }
-        else
-        {
-            descTexture.readMode         = cudaReadModeElementType;
-        }
+        descTexture.normalizedCoords = false;
+        descTexture.readMode         = (flagReadNormalized == true) ? cudaReadModeNormalizedFloat : cudaReadModeElementType;
         m_flagReadNormalized = flagReadNormalized;
 
         // Create texture object and get handle
@@ -263,6 +246,15 @@ protected:
             cudaFreeArray(m_dpImageArray);
             m_dpImageArray = nullptr;
             throw CRuntimeException(std::string("PIP::CUDAByteImage : CUDA texture create error : \"") + std::string(cudaGetErrorString(e)) + std::string("\""));
+        }
+
+        // Copy image data to cuda device array
+        cudaMemcpyToArray( m_dpImageArray, 0, 0, (void *) spImage->data(), spImage->bytecount(), cudaMemcpyHostToDevice);
+        if ((e = cudaGetLastError()) != 0)
+        {
+            cudaFreeArray(m_dpImageArray);
+            m_dpImageArray = nullptr;
+            throw CRuntimeException(std::string("PIP::CCUDAImageTexture : CUDA image copy error : \"") + std::string(cudaGetErrorString(e)) + std::string("\""));
         }
 
         // Store input image properties
@@ -508,7 +500,6 @@ protected:
             copyParams.srcPtr = make_cudaPitchedPtr(  (*itSlices)->data(), m_intSliceWidth * (intBytesChannel1 + intBytesChannel2 + intBytesChannel34),
                                                       m_intSliceWidth, m_intSliceHeight);
             cudaMemcpy3D(&copyParams);
-            //cudaMemcpyToArray(m_dpVolumeArray, 0, 0, (void *) spImage->data(), spImage->bytecount(), cudaMemcpyHostToDevice);
             if ((e = cudaGetLastError()) != 0)
             {
                 m_dpVolumeArray = nullptr;
@@ -533,6 +524,7 @@ protected:
         memset(&descTexture, 0, sizeof(descTexture));
         descTexture.addressMode[0]   = cudaAddressModeClamp;
         descTexture.addressMode[1]   = cudaAddressModeClamp;
+        descTexture.addressMode[2]   = cudaAddressModeClamp;
         descTexture.filterMode       = cudaFilterModeLinear;
         descTexture.normalizedCoords = 0;
 
@@ -1003,6 +995,6 @@ protected:
 ///////////////////////////////////////////////////////////////////////////////////////
 ///                      INITIALIZER FOR FIRST CUDA MALLOC
 ///////////////////////////////////////////////////////////////////////////////////////
-void MF_InitializeCUDA();
+void PIP_InitializeCUDA();
 
 } // namespace MF

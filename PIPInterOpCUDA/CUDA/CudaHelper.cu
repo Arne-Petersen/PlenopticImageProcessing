@@ -25,7 +25,8 @@ __global__ void computeDummy(float* inout, cudaTextureObject_t texInput, int wid
     const int idxX = blockIdx.x * blockDim.x + threadIdx.x;
     const int idxY = blockIdx.y * blockDim.y + threadIdx.y;
     if ((idxX > width-1)||(idxY > height-1)) { return; }
-    float a = tex2D<float>(texInput, float(idxX)+0.5f,float(idxY)+0.5f);
+    float a = tex2D<float>(texInput, float(idxX)+0.5f,float(idxY)+0.5f)
+            + tex2D<float>(texInput, float(idxX)-0.5f,float(idxY)-0.5f);
     inout[ idxY*width + idxX ] = a;
 }
 

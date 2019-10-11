@@ -234,15 +234,16 @@ __device__ float computeFineRegulatedCost(float* cdata, uint j)
             // basic average cost measure for active neighbor and disparity (C^f(x-w,d_j;a))
             a = cdata[index];
             // basic average cost measure for active neighbor and next disparity (C^f(x-w,d_{j+1};a))
-            b = (j < t_CNTDISPSTEPS-1) ? cdata[index + 1] : globalParams.cmax;
+            //b = (j < t_CNTDISPSTEPS-1) ? ( cdata[(index + 1)] ) : (globalParams.cmax); this line core-dumps nvidia compiler in CUDA 10.1
+            b = (j < t_CNTDISPSTEPS-1) ? ( *(cdata + index + 1) ) : (globalParams.cmax);
             // basic average cost measure for active neighbor and previous disparity (C^f(x-w,d_{j-1};a))
-            c = (j > 0) ? cdata[index - 1] : globalParams.cmax;
+            c = (j > 0) ? (cdata[(index - 1)]) : globalParams.cmax;
             // minimal basic average cost measure for active neighbor over all disparities ( min_i(C^f(x-w,d_i;a) )
             d = globalParams.cmax;
             index = sharedMemoryIndex<t_CNTDISPSTEPS>((uint) x, (uint) y, 0);
             for(uint i=0; i<t_CNTDISPSTEPS; i++)
             {
-                d = min(d, cdata[index + i]);
+                d = min(d, (cdata[(index + i)]));
             }
 
             // add penalties
@@ -417,13 +418,13 @@ __global__ void computeDisparity_refine(float * outputData, float* outputWeights
 #ifdef LENSSTEP2
     const float fInitialDisparity_px =
         (t_eGridType == EGridType::HEXAGONAL) ? fInitialDisparityNormalized*(1.73205f * globalParams.descrMla.fMicroLensDistance_px)
-        : fInitialDisparityNormalized*(2.0f * globalParams.descrMla.fMicroLensDistance_px)
+        : fInitialDisparityNormalized*(2.0f * globalParams.descrMla.fMicroLensDistance_px);
 #else
     const float fInitialDisparity_px = fInitialDisparityNormalized*(globalParams.descrMla.fMicroLensDistance_px);
 #endif
 
-        // target lenses (pixel position of micro IMAGE center) & epipolar lines (normalized vectors)
-        __shared__ vec2<float> arrTargetImageCenters_px[6];
+    // target lenses (pixel position of micro IMAGE center) & epipolar lines (normalized vectors)
+    __shared__ vec2<float> arrTargetImageCenters_px[6];
     __shared__ vec2<float> arrEpilineDir[6];
 
     if(threadIdx.x == 0 && threadIdx.y == 0)

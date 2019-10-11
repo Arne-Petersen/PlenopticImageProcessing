@@ -40,7 +40,9 @@ __global__ void computeCrosscheck(float* outputDisparities, cudaTextureObject_t 
 
     // reject out of bounds pixels
     if (((vPixelPos_px.x < float(nWidth)-1) && (vPixelPos_px.y < float(nHeight)-1)) == false)
+    {
         return;
+    }
 
     // Initial disparity normalized with lens diameter (inter-lens distance)
     float fInitialDisparity_px = tex2D<float>(texInputDisparities, vPixelPos_px.x + 0.5f, vPixelPos_px.y + 0.5f);
@@ -130,10 +132,10 @@ __global__ void computeCrosscheck(float* outputDisparities, cudaTextureObject_t 
 #endif //SECONDLENSLEVEL
     {
         // pixel relative to reference lens -> corresponding pixel in target lens -> add epiline * disp
-        vec2<float> vTargetPixel = (vPixelPos_px - vMicroLensCenter_px)
+        vec2<float> vTargetPixel_px = (vPixelPos_px - vMicroLensCenter_px)
                                    + globalMlaDescr.GetMicroLensCenter_px<t_eGridType>(vTargetLensIdcs[i]) - fInitialDisparity_px * vs[i];
         // Get disparity estimated in other lens
-        const float fTargetDisparity = tex2D<float>(texInputDisparities, vTargetPixel.x + 0.5f, vTargetPixel.y + 0.5f)
+        const float fTargetDisparity_px = tex2D<float>(texInputDisparities, vTargetPixel_px.x + 0.5f, vTargetPixel_px.y + 0.5f)
 #ifdef SECONDLENSLEVEL
                                        * ( ((t_eGridType==EGridType::HEXAGONAL)?1.73205f:2.0f)  * globalMlaDescr.fMicroLensDistance_px);
 #else // SECONDLENSLEVEL
@@ -141,11 +143,11 @@ __global__ void computeCrosscheck(float* outputDisparities, cudaTextureObject_t 
 #endif // SECONDLENSLEVEL
 
         // Check validity and update mean
-        if  ((vTargetPixel - globalMlaDescr.GetMicroImageCenter_px<t_eGridType>(vTargetLensIdcs[i])).length() + 1.0f
+        if  ((vTargetPixel_px - globalMlaDescr.GetMicroImageCenter_px<t_eGridType>(vTargetLensIdcs[i])).length() //+ 1.0f
              < globalMlaDescr.GetMicroImageRadius_px())
         {
-            cntValid += int(fabsf(fTargetDisparity - fInitialDisparity_px) < fMaxDispDiff);
-            fAvgDisp += float(fabsf(fTargetDisparity - fInitialDisparity_px) < fMaxDispDiff) * fTargetDisparity;
+            cntValid += int(fabsf(fTargetDisparity_px - fInitialDisparity_px) < fMaxDispDiff);
+            fAvgDisp += float(fabsf(fTargetDisparity_px - fInitialDisparity_px) < fMaxDispDiff) * fTargetDisparity_px;
         }
         else
         {

@@ -145,13 +145,13 @@ QtPlenopticTools::MainWindow::MainWindow(QWidget *parent) :
     // ... parameters controling output camera for fusion (all-in-focus and 2.5D depthmap)
     m_pSliderWidget->AddGroupLabel(":0group", "Output Parameters", "");
     m_pSliderWidget->AddSlider(PT_SLIDER_OUTPUT_WIDTH, "width of TF image and 2.5D depthmap",
-                               float(projTarget.vecRes.x), 100, 3000, 2901);
+                               float(projTarget.vecRes.x), 100, 3000, 2900);
     m_pSliderWidget->AddSlider(PT_SLIDER_OUTPUT_HEIGHT, "height of TF image and 2.5D depthmap",
-                               float(projTarget.vecRes.y), 100, 3000, 2901);
+                               float(projTarget.vecRes.y), 100, 3000, 2900);
     m_pSliderWidget->AddSlider(PT_SLIDER_OUTPUT_SENSORWIDTH, "width of sensor [mm] for virtual camera",
                                20.0f, 1, 100, 1000);
     m_pSliderWidget->AddSlider(PT_SLIDER_OUTPUT_FLENGTH, "focal length [mm] for virtual camera",
-                               fTargPxSize_mm * projTarget.GetK()(0, 0), 1, 1000, 10000);
+                               fTargPxSize_mm * projTarget.GetK()(0, 0), 1, 1000, 9990);
     m_pSliderWidget->AddSlider(PT_SLIDER_OUTPUT_DISPLACEX, "x-displacement [mm] for virtual camera",
                                projTarget.mtPose_r_c.t_rl_l.x, -100, 100, 1000);
     m_pSliderWidget->AddSlider(PT_SLIDER_OUTPUT_DISPLACEY, "y-displacement [mm] for virtual camera",
@@ -225,12 +225,12 @@ QtPlenopticTools::MainWindow::MainWindow(QWidget *parent) :
     connect(qApp, &QApplication::aboutToQuit, this, &QtPlenopticTools::MainWindow::OnFormExit_triggered);
     connect(ui->actionExit, &QAction::triggered, this, &QtPlenopticTools::MainWindow::OnFormExit_triggered);
 
-    //    // For linux platforms CUDA takes some time to allocate first memory slot. Force this here...
-    //    _AppendText("Initializing CUDA...");
-    //    this->setEnabled(false);
-    //    MF_InitializeCUDA();
-    //    this->setEnabled(true);
-    //    _AppendText("DONE!");
+        // For linux platforms CUDA takes some time to allocate first memory slot. Force this here...
+        _AppendText("Initializing CUDA...");
+        this->setEnabled(false);
+        PIP_InitializeCUDA();
+        this->setEnabled(true);
+        _AppendText("DONE!");
 
     // Allocate estimators using customization interface.
     _c_AllocateModules();
@@ -854,6 +854,7 @@ void QtPlenopticTools::MainWindow::_ComputeDepth()
         {
             m_spLFDepthMap = CVImage_sptr(new CVImage());
         }
+        //m_spLFDepthMap = spDispImage;//->Clone(*m_spLFDepthMap);
         spDispImage->Clone(*m_spLFDepthMap);
     }
     catch (const std::exception& exc)
@@ -926,11 +927,6 @@ void QtPlenopticTools::MainWindow::_ComputeFusion()
     m_pProjectVirtualToObject->UnprojectDisparities(m_spRawPoints3D, m_spRawPointColors, m_spDepth2D, m_spAllInFocus,
                                                     spDispImage, m_spWorkRawImage);
 
-    //    CCUDAMicrolensFusion::Unproject(m_spRawPoints3D, m_spRawPointColors, m_spDepth2D, m_spAllInFocus,
-    //                                    spDispImage, m_spWorkRawImage, m_descrMLA, projTarget,
-    //                                    m_pSliderWidget->GetValue(PT_SLIDER_ESTIMATOR_MINDISP),
-    //                                    m_pSliderWidget->GetValue(PT_SLIDER_ESTIMATOR_MAXDISP));
-
     // Apply filling with median filter if requested
     if (ui->checkBox_MedFilt2D->isChecked())
     {
@@ -940,11 +936,13 @@ void QtPlenopticTools::MainWindow::_ComputeFusion()
         CCUDAMicrolensFusion::MedianFill<1>(m_spDepth2D, true);
     }
 
-    CCUDAMicrolensFusion::ImageSynthesis<unsigned char>(m_spAllInFocus, m_spDepth2D, m_spWorkRawImage,
-                                                        m_descrMLA, projTarget);
+    CCUDAMicrolensFusion::ImageSynthesis<unsigned char>(m_spAllInFocus, m_spDepth2D, m_spWorkRawImage, m_descrMLA, projTarget);
+    //m_spAllInFocus->CvMat().convertTo(m_spAllInFocus->CvMat(), CV_8UC3, 255.0f);
+    //m_spAllInFocus->descrMetaData.eImageType = EImageType::RGB;
+
     ui->graphicsViewThirdImage->SetImage(*m_spAllInFocus);
 
-    if (true)
+    // Draw colored 2D depthmap
     {
         // normalize depth map and scale to 255 based on set raw depth disparity
         double dMax =
@@ -1252,10 +1250,10 @@ void QtPlenopticTools::MainWindow::_DisplayColoredDepth()
 
     // create filtered version of depthmap
     CVImage_sptr spDispImage(new CVImage(m_spLFDepthMap->cols(), m_spLFDepthMap->rows(), CV_32FC1, EImageType::GRAYDEPTH));
+    std::map<std::string,double> mapParams;
+    _c_GetParameterMap(mapParams);
     if (ui->checkBox_CrossCheck->isChecked() == true)
     {
-        std::map<std::string,double> mapParams;
-        _c_GetParameterMap(mapParams);
         m_pDisparityRefiner->SetParameters(m_descrMLA, mapParams);
         m_pDisparityRefiner->RefineDisparities(spDispImage, m_spLFDepthMap);
     }

@@ -48,7 +48,8 @@ __device__ __constant__ int2 globalOffsetsGridIdcsReg[4];
 template<const int t_intChannels, const EGridType t_eGridType>
 __global__ void computeUnproject(float* outputPoints3D, float* outputPointColors,
         float* outputDepthmap, float* outputSynthImage,
-        cudaTextureObject_t texInputDisparities, cudaTextureObject_t texInputPlenopticImage)
+        cudaTextureObject_t texInputDisparities, cudaTextureObject_t texInputPlenopticImage,
+                                 const int intArrLength)
 {
     // Get pixel position and test 'in image'
     vec2<float> vPixelPos_px;
@@ -56,7 +57,7 @@ __global__ void computeUnproject(float* outputPoints3D, float* outputPointColors
 
     // reject out of bounds pixels
     if ((vPixelPos_px.x < float(globalParams.vUpperLeft.x)) || (vPixelPos_px.y < float(globalParams.vUpperLeft.y))
-        || (vPixelPos_px.x >= float(globalParams.vLowerRight.x)) || (vPixelPos_px.y >= float(globalParams.vLowerRight.y)))
+        || (vPixelPos_px.x > float(globalParams.vLowerRight.x)) || (vPixelPos_px.y > float(globalParams.vLowerRight.y)))
         return;
 
     // Initial disparity normalized with lens diameter (inter-lens distance)
@@ -64,7 +65,10 @@ __global__ void computeUnproject(float* outputPoints3D, float* outputPointColors
     // Zero-disparity is invalid estimation
     if ((fDisparity_baselines == 0.0f)
         ||(fDisparity_baselines < globalParams.fMinNormedDisp)
-        ||(fDisparity_baselines > globalParams.fMaxNormedDisp)) return;
+        ||(fDisparity_baselines > globalParams.fMaxNormedDisp))
+    {
+        return;
+    }
 
     // Get index of source lens in grid
     vec2<float> vGridIndex;
@@ -85,6 +89,10 @@ __global__ void computeUnproject(float* outputPoints3D, float* outputPointColors
     // Write output position
     int index = int(vPixelPos_px.y) * (globalParams.vLowerRight.x - globalParams.vUpperLeft.x + 1) * 4
                 + int(vPixelPos_px.x) * 4;
+
+//    if (index >= 4*intArrLength)
+//        printf("index %d, px [%g;%g]\n", index, vPixelPos_px.x, vPixelPos_px.y);
+
     // output data format: normalize float with lens diameter
     outputPoints3D[index + 0] = vPos3D.x;
     outputPoints3D[index + 1] = vPos3D.y;
@@ -122,8 +130,8 @@ __global__ void computeUnproject(float* outputPoints3D, float* outputPointColors
     // Project 3-space point to virtual camera and add weighted (by raw images alpha) color/depth to AiF/depth image sum
     vec2<float> vTargetPixel = globalParams.projTarget.Project(vPos3D);
     if ((vTargetPixel.x < 1)||(vTargetPixel.y < 1)
-        ||(vTargetPixel.x > globalParams.projTarget.vecRes.x-2)
-        ||(vTargetPixel.y > globalParams.projTarget.vecRes.y-2))
+        ||(vTargetPixel.x > float(globalParams.projTarget.vecRes.x-2))
+        ||(vTargetPixel.y > float(globalParams.projTarget.vecRes.y-2)))
     {
         // projected fusion pixel is out of bounds
         return;
@@ -152,7 +160,7 @@ __global__ void computeNormalizeDepthmap(float* inoutDepthSum, float* inoutColor
         return;
     }
 
-    const int index = int(vPixelPos_px.y) * iWidth * 4 + int(vPixelPos_px.x) * 4;
+    const int index = vPixelPos_px.y * iWidth * 4 + vPixelPos_px.x * 4;
     const float fWeight = inoutColorsAndWeightSum[index + 3];
     if (fWeight != 0)
     {
@@ -301,7 +309,8 @@ void CCUDAUnprojectFromDisparity_basic::UnprojectDisparities( CVImage_sptr& spPo
                                                                                arrOutDepthmap.GetDevicePointer(),
                                                                                arrOutSynthImage.GetDevicePointer(),
                                                                                texInputDisparities.GetTextureObject(),
-                                                                               texInputImage.GetTextureObject());
+                                                                               texInputImage.GetTextureObject(),
+                                                                               spPlenopticImage->rows()*spPlenopticImage->cols());
     }
     else if ((spPlenopticImage->CvMat().channels() == 2)&&(m_descrMLA.eGridType == EGridType::RECTANGULAR))
     {
@@ -310,7 +319,8 @@ void CCUDAUnprojectFromDisparity_basic::UnprojectDisparities( CVImage_sptr& spPo
                                                                                  arrOutDepthmap.GetDevicePointer(),
                                                                                  arrOutSynthImage.GetDevicePointer(),
                                                                                  texInputDisparities.GetTextureObject(),
-                                                                                 texInputImage.GetTextureObject());
+                                                                                 texInputImage.GetTextureObject(),
+                                                                                 spPlenopticImage->rows()*spPlenopticImage->cols());
     }
     else if (m_descrMLA.eGridType == EGridType::HEXAGONAL)
     {
@@ -319,7 +329,8 @@ void CCUDAUnprojectFromDisparity_basic::UnprojectDisparities( CVImage_sptr& spPo
                                                                                arrOutDepthmap.GetDevicePointer(),
                                                                                arrOutSynthImage.GetDevicePointer(),
                                                                                texInputDisparities.GetTextureObject(),
-                                                                               texInputImage.GetTextureObject());
+                                                                               texInputImage.GetTextureObject(),
+                                                                               spPlenopticImage->rows()*spPlenopticImage->cols());
     }
     else if (m_descrMLA.eGridType == EGridType::RECTANGULAR)
     {
@@ -328,7 +339,8 @@ void CCUDAUnprojectFromDisparity_basic::UnprojectDisparities( CVImage_sptr& spPo
                                                                                  arrOutDepthmap.GetDevicePointer(),
                                                                                  arrOutSynthImage.GetDevicePointer(),
                                                                                  texInputDisparities.GetTextureObject(),
-                                                                                 texInputImage.GetTextureObject());
+                                                                                 texInputImage.GetTextureObject(),
+                                                                                 spPlenopticImage->rows()*spPlenopticImage->cols());
     }
 
     // Wait for kernels to finish and check for errors
