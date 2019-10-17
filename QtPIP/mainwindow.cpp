@@ -23,8 +23,11 @@
 #include "PIPAlgorithms/CUDA/DisparityRefinement_Crosscheck.hh"
 /// REPLACE WITH YOUR PROJECTION MAPPING HEADER
 #include "PIPAlgorithms/CUDA/UnprojectFromDisparity_basic.hh"
+/// REPLACE WITH YOUR AIF FUSION HEADER
+#include "PIPAlgorithms/CUDA/AllInFocusSynthesis.hh"
+/// REPLACE WITH YOUR DEPTH FILLING HEADER
+#include "PIPAlgorithms/CUDA/MedianFill.hh"
 
-#include "PIPAlgorithms/CUDA/MicrolensFusion.hh"
 #include "PIPAlgorithms/CUDA/MlaVisualization.hh"
 #include "PIPAlgorithms/CUDA/VignettingNormalization.hh"
 #include "PIPAlgorithms/PlenopticTools.hh"
@@ -38,6 +41,10 @@
 
 #include <opencv2/opencv.hpp>
 
+
+//////////////////////////////////////////////////////////////////////////////////
+///  Definition of string IDs for parameters in parameter map and slider window
+//////////////////////////////////////////////////////////////////////////////////
 #define PT_SLIDER_OUTPUT_WIDTH "Output Width"
 #define PT_SLIDER_OUTPUT_HEIGHT "Output Height"
 #define PT_SLIDER_OUTPUT_SENSORWIDTH "Output Sensor Width"
@@ -71,9 +78,16 @@ using namespace PIP;
 
 void QtPlenopticTools::MainWindow::_c_AllocateModules()
 {
+    /// REPLACE WITH YOUR DISPARITY ESTIMATOR ALLOCATION
     m_pDisparityEstimator = new CCUDADisparityEstimation_OFL();
+    /// REPLACE WITH YOUR DISPARITY REFINEMENT ALLOCATION
     m_pDisparityRefiner = new CCUDADisparityRefinement_Crosscheck();
+    /// REPLACE WITH YOUR PROJECTION MAPPING ALLOCATION
     m_pProjectVirtualToObject = new CCUDAUnprojectFromDisparity_basic();
+    /// REPLACE WITH YOUR AIF FUSOR ALLOCATION
+    m_pAiFSynthesizer = new CCUDAAllInFocusSynthesis_basic();
+    /// REPLACE WITH YOUR DEPTH FILLER ALLOCATION
+    m_pDepthFiller = new CCUDAMedianFill();
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -930,13 +944,28 @@ void QtPlenopticTools::MainWindow::_ComputeFusion()
     // Apply filling with median filter if requested
     if (ui->checkBox_MedFilt2D->isChecked())
     {
+        // Disable smoothing and use large window for first call to fill algo (fill only)
+        mapParams["Fill Smoothing"] = 0;
+        mapParams["Fill HWS"] = 5;
+        m_pDepthFiller->SetParameters(mapParams);
         // Apply 11x11 median-fill on 2.5D depthmap
-        CCUDAMicrolensFusion::MedianFill<5>(m_spDepth2D, false);
+        m_pDepthFiller->Fill(m_spDepth2D);
+
         // Apply 3x3 median-fill + smoothing on 2.5D depthmap
-        CCUDAMicrolensFusion::MedianFill<1>(m_spDepth2D, true);
+        mapParams["Fill Smoothing"] = 1;
+        mapParams["Fill HWS"] = 1;
+        m_pDepthFiller->SetParameters(mapParams);
+        m_pDepthFiller->Fill(m_spDepth2D);
     }
 
-    CCUDAMicrolensFusion::ImageSynthesis<unsigned char>(m_spAllInFocus, m_spDepth2D, m_spWorkRawImage, m_descrMLA, projTarget);
+    // Set parameters for AiF generation
+    m_pAiFSynthesizer->SetParameters(m_descrMLA, projTarget, mapParams);
+    // Discard simple AiF from unprojection and set output type as uchar (image view doesn't support more).
+    m_spAllInFocus->Reinit(projTarget.vecRes.x, projTarget.vecRes.y, CV_8UC4, EImageType::RGBA);
+    // Call AiF image fusion
+    m_pAiFSynthesizer->SynthesizeAiF(m_spAllInFocus, m_spDepth2D, m_spWorkRawImage);
+
+    // needed for displaying image if output is set to be float (std output of UnprojectDisparities)
     //m_spAllInFocus->CvMat().convertTo(m_spAllInFocus->CvMat(), CV_8UC3, 255.0f);
     //m_spAllInFocus->descrMetaData.eImageType = EImageType::RGB;
 

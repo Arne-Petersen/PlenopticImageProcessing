@@ -35,8 +35,10 @@ SET(PIPAlgorithms_CUDA_SRCS
     CUDA/MlaVisualization.cu
     CUDA/UnprojectFromDisparity_basic.hh
     CUDA/UnprojectFromDisparity_basic.cu
-    CUDA/MicrolensFusion.hh
-    CUDA/MicrolensFusion.cu
+    CUDA/MedianFill.hh
+    CUDA/MedianFill.cu
+    CUDA/AllInFocusSynthesis.hh
+    CUDA/AllInFocusSynthesis.cu
     CUDA/DisparityRefinement_Crosscheck.hh
     CUDA/DisparityRefinement_Crosscheck.cu
     CUDA/DisparityEstimation_OFL.hh

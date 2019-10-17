@@ -199,7 +199,7 @@ public:
     /// Exceptions: throws if a required parameter is not in map
     ///
     virtual void SetParameters(const SPlenCamDescription& descrMLA,
-                               const MTCamProjection<float> projTarget,
+                               const MTCamProjection<float>& projTarget,
                                const std::map<std::string,double>& mapAdditionalParams) = 0;
 
     ///

@@ -229,6 +229,17 @@ private:
     ///        and 2.5D depthmaps
     ///
     IUnprojectFromDisparity* m_pProjectVirtualToObject = nullptr;
+
+    ///
+    /// \brief m_pAiFSynthesizer module for generating AiF images from given 2D depthmap and raw
+    ///        plenoptic image.
+    ///
+    IAllInFocusSynthesis* m_pAiFSynthesizer = nullptr;
+
+    ///
+    /// \brief m_pDepthFiller module for filling 2D depthmap (e.g. default uses simple median)
+    ///
+    IFillDepth2D* m_pDepthFiller = nullptr;
 };
 
 }
