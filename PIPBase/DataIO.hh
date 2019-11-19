@@ -24,15 +24,25 @@
 
 namespace PIP
 {
+///
+/// \addtogroup Runtime
+/// \brief Basic types and data processing (IO etc.)
+/// @{
+///
 
+///
+/// \brief The CDataIO class provides a static interface of image IO.
+///
+/// Includes import/export, debayering and all-imagetypes to RGBA conversion.
+///
 class CDataIO
 {
 public:
     ///
-    /// \brief ImportImage tries to import an image from given file.
-    /// \param img import target
-    /// \param strFilename file to read
-    /// \param flagReformat true to convert to standard
+    /// \brief ImportImage tries to import an image from given file using OpenCV.
+    /// \param[out] img import target
+    /// \param[in] strFilename file to read
+    /// \param[in] flagReformat true to convert to standard
     ///
     /// Convert to standard format : OpenCV reads images in BGR[A] color model. Use 'flagReformat' to force
     /// conversion to RGBA for all (including mono) images. This is recomennded for color images since CUDA
@@ -48,10 +58,21 @@ public:
     ///
     static void ImportImage(CVImage& img, const std::string strFilename, const bool flagReformat = false);
     
+    ///
+    /// \brief ExportImage exports given image to format from filename using OpenCV.
+    /// \param[in] img image to write
+    /// \param[in] strFilename target filename
+    ///
     static void ExportImage(const CVImage& img, const std::string strFilename);
 
-    static void DebayerImage(CVImage& imgColor, const CVImage& imgBayer, const EImageType eBayerType);
-
+    ///
+    /// \brief ImageToRGBA converts given standard image (BGR, MONO, BAYER* ...) to 4-channel RGBA preserving storage type.
+    /// \param[out] imgRGBA converted image
+    /// \param[out] imgAnyType input image
+    ///
+    /// The output image will be of storage type \ref imgAnyType.type() and image type \ref EImageType::RGBA.
+    /// Non-standard images (COLOREDDEPTH, DEPTHMM...)
+    ///
     static void ImageToRGBA(CVImage& imgRGBA, const CVImage& imgAnyType);
 
     ///
@@ -61,10 +82,8 @@ public:
     /// \param intChannel
     ///
     static void ExportToASCII(const CVImage& img, const std::string &strFilename, const int intChannel = 0);
-    
-protected:
-    // Static only
-    CDataIO() {}
 };
+
+/// \@
 
 }

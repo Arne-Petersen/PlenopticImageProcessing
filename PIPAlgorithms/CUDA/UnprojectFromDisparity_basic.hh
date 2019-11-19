@@ -53,13 +53,15 @@ public:
 
     ///
     /// \brief UnprojectDisparities un-projection of given disparity map to 3D points, the
-    ///                             2.5D depthmap and according AllInFocus image
+    ///                             2.5D depthmap and according (simple) AllInFocus image.
     /// \param spPoints3D 3D point per pixel, correspondes to \ref spDisparties
     /// \param spPointsColors color per 3D point, correspondes to \ref spPoints3D
     /// \param spDepthmap 2.5D depthmap in active target projection
     /// \param spSynthImage AiF image, correspondes to \ref spDepthmap
     /// \param spDisparties input disparities (raw microimage depthmap)
     /// \param spPlenopticImage input, raw plenoptic image
+    ///
+    /// NOTE : all output images will be of 'float' datatype.
     ///
     virtual void UnprojectDisparities(CVImage_sptr& spPoints3D, CVImage_sptr& spPointsColors,
                                       CVImage_sptr &spDepthmap, CVImage_sptr &spSynthImage,

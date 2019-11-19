@@ -205,43 +205,6 @@ void CDataIO::ExportImage(const CVImage& img, const std::string strFilename)
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
-void CDataIO::DebayerImage(CVImage& imgColor, const CVImage& imgBayer, const EImageType eBayerType)
-{
-    int intColorConversionType = -1;
-
-    switch (eBayerType)
-    {
-      case EImageType::Bayer_BGGR:
-          // Debayer with alpha broken is CV ?
-          intColorConversionType = cv::COLOR_BayerRG2RGBA;
-          break;
-
-      case EImageType::Bayer_RGGB:
-          // Debayer with alpha broken is CV ?
-          intColorConversionType = cv::COLOR_BayerBG2RGBA;
-          break;
-
-      case EImageType::Bayer_GRBG:
-          // Debayer with alpha broken is CV ?
-          intColorConversionType = cv::COLOR_BayerGB2RGBA;
-          break;
-
-      case EImageType::Bayer_GBRG:
-          // Debayer with alpha broken is CV ?
-          intColorConversionType = cv::COLOR_BayerGR2RGBA;
-          break;
-
-      default:
-          throw CRuntimeException("Ivalid or no bayer type given!");
-    }
-
-    // Allocate cv::Mat object if needed
-    imgColor.InitCvMat();
-    // apply conversion
-    cv::cvtColor(imgBayer.CvMat(), imgColor.CvMat(), intColorConversionType);
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////////
 void CDataIO::ImageToRGBA(CVImage& imgRGBA, const CVImage& imgAnyType)
 {
     if (imgAnyType.descrMetaData.eImageType == EImageType::RGBA)
@@ -278,25 +241,25 @@ void CDataIO::ImageToRGBA(CVImage& imgRGBA, const CVImage& imgAnyType)
           break;
 
       case EImageType::Bayer_BGGR:
-          // Debayer in opencv seams braoken when combined with alpha, go RGB->RGBA
+          // Debayer in opencv ?broken? (for 'some' 3. versions) when combined with alpha, go ->RGB->RGBA
           intColorConversionType = cv::COLOR_BayerRG2RGB;
           flagFromBayer = true;
           break;
 
       case EImageType::Bayer_RGGB:
-          // Debayer in opencv seams braoken when combined with alpha, go RGB->RGBA
+          // Debayer in opencv ?broken? (for 'some' 3. versions) when combined with alpha, go ->RGB->RGBA
           intColorConversionType = cv::COLOR_BayerBG2RGB;
           flagFromBayer = true;
           break;
 
       case EImageType::Bayer_GRBG:
-          // Debayer in opencv seams braoken when combined with alpha, go RGB->RGBA
+          // Debayer in opencv ?broken? (for 'some' 3. versions) when combined with alpha, go ->RGB->RGBA
           intColorConversionType = cv::COLOR_BayerGB2RGB;
           flagFromBayer = true;
           break;
 
       case EImageType::Bayer_GBRG:
-          // Debayer in opencv seams braoken when combined with alpha, go RGB->RGBA
+          // Debayer in opencv ?broken? (for 'some' 3. versions) when combined with alpha, go ->RGB->RGBA
           intColorConversionType = cv::COLOR_BayerGR2RGB;
           flagFromBayer = true;
           break;

@@ -28,6 +28,12 @@
 
 namespace PIP
 {
+///
+/// \addtogroup Runtime
+/// \brief Basic types and data processing (IO etc.)
+/// @{
+///
+
 
 ///
 /// \brief Class implementing data wrapper for opencv images and misc data
@@ -552,5 +558,7 @@ constexpr int CVImage::GetCvTypeFromTypename<float, 4>()
 
 /// \brief CVImage_sptr Shared pointer to manage images, mostly not to be deleted on task destruction
 using CVImage_sptr = std::shared_ptr<CVImage>;
+
+/// @}
 
 }

@@ -183,7 +183,7 @@ QtPlenopticTools::MainWindow::MainWindow(QWidget *parent) :
     m_descrMLA.fMicroImageDiam_MLDistFrac = 0.95f; // omit outer 5percent of micro images as default
     m_pSliderWidget->AddGroupLabel(":2group", "MLA settings", "description of MLA properties.");
     m_pSliderWidget->AddSlider(PT_SLIDER_MLA_GRIDROT, "Rotation of MLA in [rad] with respect to images x-axis.",
-                               m_descrMLA.fGridRot_rad, -MF_PI/20.0, MF_PI/20.0, 10000);
+                               m_descrMLA.fGridRot_rad, -MATHCONST_PI/20.0, MATHCONST_PI/20.0, 10000);
     m_pSliderWidget->AddSlider(PT_SLIDER_MLA_MLENSDIST, "Distance between two micro lenses in [px]",
                                m_descrMLA.fMicroLensDistance_px, 0, 100, 20000);
     m_pSliderWidget->AddSlider(PT_SLIDER_MLA_MLIMAGESCALE, "Scale between micro lens grid and micro image grid",

@@ -1,4 +1,4 @@
-/*! \mainpage A brief introduction to the ModuleFramework MF
+/*! \mainpage A brief introduction to the  Plenoptic Image Processing Framework
  *
  * \section intro_sec Introduction
  *
@@ -10,12 +10,16 @@
  *
  * For configuration and compilation the CMake build system (minimum version 3.8) is recommended. Project files are available and allow for configuration of features and development environment.
  *
- * OpenCV is used for all basic image processing tasks. These includes low level data representation of images as well as import/export from/to standard file formats. Examples and programs make use of OpenCVs build in highgui for command line tools to display images.
+ * OpenCV is used for all basic image processing and IO tasks. These includes low level data representation of images as well as import/export from/to standard file formats. Examples and programs make use of OpenCVs build in highgui for command line tools to display images.
  * 
  */
 
-/// The modules that are implemented in the framework. They provide the top-level access to algorithms and classes embedded in the framework.
-/// \defgroup Modules Modules
+/// The interfaces to be implemented in new algorithms. Derive from these virtual classes, to allow for generalized access in the Qt GUI program
+/// \defgroup Interfaces Interfaces
 
-/// Algorithm core of the framework. Includes implementation of available algorithms, data structures and control structures.
+/// Implementations of algorithms based on \ref Interfaces. Newly implemented algorithms and methods are to be groupped here.
+/// \defgroup Algorithms Algorithms
+
+/// Basic core runtime for datastructures/methods. E.g. images and IO, basic algerba, low level image processing (conversion, debayer...).
+/// Also control structures are resided here, i.e. the exception classes.
 /// \defgroup Runtime Runtime

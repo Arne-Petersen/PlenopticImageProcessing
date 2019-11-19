@@ -14,7 +14,7 @@
  *    LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
  *    NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
  *    WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
- *    SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.#pragma once
+ *    SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
 #pragma once
@@ -25,11 +25,17 @@
 
 #include "opencv2/core/mat.hpp"
 
-constexpr auto MF_PI = 3.1415926535897932384626433832795;
-
-
 namespace PIP
 {
+///
+/// \addtogroup Runtime
+/// \brief Basic types and data processing (IO etc.)
+/// @{
+///
+
+/// Global constant for math pi at double precision
+constexpr auto MATHCONST_PI = 3.1415926535897932384626433832795;
+
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////                             IMAGES
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -176,6 +182,7 @@ struct SImageDataDescriptor
 
     ///
     /// \brief GetBytesPerChannel returns the number of bytes per channel needed for given image format
+    /// \param intCvStrgTp cv storage type
     /// \return byte count per channel
     ///
     static inline int GetBytesPerChannel(const int intCvStrgTp)
@@ -206,8 +213,9 @@ struct SImageDataDescriptor
     }
 
     ///
-    /// \brief GetChannelsPerPixel returns the number of channels per pixel needed for given image format
-    /// \return byte count per channel
+    /// \brief GetChannelsPerPixel returns the number of channels per pixel needed for given image data type (as from opencv : CV_8UC3 etc.)
+    /// \param intCvStrgTp cv storage type
+    /// \return byte count per channel, -1 for unknown
     ///
     static inline int GetChannelsPerPixel(const int intCvStrgTp)
     {
@@ -289,7 +297,9 @@ struct SImageDataDescriptor
     EImageType eImageType = EImageType::UNKNOWN;
 };
 
-/// Stream operator for writing EDFImageIOCommand values to string output stream
+///
+/// \brief Stream operator for writing image type enums to string output stream
+///
 inline std::ostream& operator<<(std::ostream& os, const EImageType enumValue)
 {
     switch(enumValue)
@@ -327,7 +337,9 @@ inline std::ostream& operator<<(std::ostream& os, const EImageType enumValue)
     return os;
 }
 
-/// String concatination operator for explicit conversion of EDFImageIOCommand to string
+///
+/// \brief String concatenation operator for explicit conversion of image type enums to string
+///
 inline std::string& operator+=(std::string& stdIn, const EImageType enumValue)
 {
     switch(enumValue)
@@ -366,3 +378,5 @@ inline std::string& operator+=(std::string& stdIn, const EImageType enumValue)
 }
 
 } // namespace MF
+
+/// @}

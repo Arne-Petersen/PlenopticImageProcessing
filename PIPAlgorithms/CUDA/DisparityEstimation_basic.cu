@@ -280,7 +280,7 @@ void CCUDADisparityEstimation_basic::EstimateDisparities(CVImage_sptr& spDispart
     // Number of lenses in X-axis of ! MLA !
     const int intNumLensXdir = int(ceil( float(spPlenopticImage->cols()) / (m_params.descrMla.fMlaImageScale * m_params.descrMla.fMicroLensDistance_px) ));
     // Resulting number on Y-axis for hex-grid
-    const int intNumLensYdir = int(ceil(double(intNumLensXdir) / sin(MF_PI/3.0)));
+    const int intNumLensYdir = int(ceil(double(intNumLensXdir) / sin(PIP::MATHCONST_PI/3.0)));
 
     // Call kernel
     // Each block represents a lens, each thread processes one pixel
