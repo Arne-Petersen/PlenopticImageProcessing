@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<opencv_storage>
+<MlaDescription>
+  <IsHexGrid>1</IsHexGrid>
+  <GridRotRAD>0.</GridRotRAD>
+  <MlaCenterPX>
+    1.4995000000000000e+03 1.4995000000000000e+03</MlaCenterPX>
+  <SensorResPX>
+    3000 3000</SensorResPX>
+  <MicroLensDistancePX>3.0004070281982422e+01</MicroLensDistancePX>
+  <MainPrincipalPointPX>
+    1.4995000000000000e+03 1.4995000000000000e+03</MainPrincipalPointPX>
+  <MlaImageScale>1.0223000049591064e+00</MlaImageScale>
+  <MicroLensFocalLengthPX>2.3192361450195312e+02</MicroLensFocalLengthPX>
+  <MainLensFLengthMM>100.</MainLensFLengthMM>
+  <MainLensFDistMM>123.</MainLensFDistMM>
+  <PixelsizeMM>7.3299999348819256e-03</PixelsizeMM></MlaDescription>
+</opencv_storage>
