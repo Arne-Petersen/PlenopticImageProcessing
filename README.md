@@ -24,7 +24,7 @@ The whole software is dependend only on a few external software packages. This i
 
 3. CUDA (9.1 and 10 actively used, >= 8 'should' work)
 
-4. Compiler with full C++11 support (tested gcc-6, MS VisualStudion 2017) and compatible to used CUDA version
+4. Compiler with full C++11 support (tested gcc-6/7, MS VisualStudio 2017) and compatible to used CUDA version
 
 5. Qt5 (actively used 5.11 linux, 5.12 Windows)
 
@@ -39,3 +39,6 @@ With a CMake consistent installation of all depoendencies, configuration "should
    
 2. use CMAKE_CXX_COMPILER and CMAKE_C_COMPILER ('ccmake' advanced config, hit 't') to select a compiler compatible to CUDA version.
    * ATTENTION : Not all compiler versions can host nvcc	(if someone has a compatibility table, please share)
+
+### Test data
+Test data, created using blender cycles raytracer, can be found in SampleData folder in the repository. In the [brother](https://github.com/Arne-Petersen/Plenoptic-Simulation) repository @@ you can find the blender package to create your own synthetical data. All MLA and main-lens properties can be controlled for creating realistic plenoptic images.
