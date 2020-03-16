@@ -211,7 +211,7 @@ void CCUDAUnprojectFromDisparity_basic::UnprojectDisparities( CVImage_sptr& spPo
     }
 
     CCUDAImageArray<float> arrOutPoints3D(spPoints3D);
-    // ??? ATTENTION : CUDA SPECIAL, if set to 0 memory is compromised ('random' values occur?)
+    /// \todo check for illegal use of \ref cudaMemset. Observed CUDA SPECIAL : if set to 0 memory is compromised ('random' values occur?)
     cudaMemset(arrOutPoints3D.GetDevicePointer(), 255, spPoints3D->bytecount());
     if ((e = cudaGetLastError()) != 0)
     {

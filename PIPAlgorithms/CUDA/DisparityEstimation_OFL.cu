@@ -355,9 +355,9 @@ __global__ void computeDisparity(float * outputData, float* outputWeights, cudaT
     }
 
     // index in output array
-    const uint f = uint(floorf(vRelativeReferencePos_px.x+vMicroImageCenter_px.x + 0.5f));
-    const uint g = uint(floorf(vRelativeReferencePos_px.y+vMicroImageCenter_px.y + 0.5f));
-    const uint index = g*globalParams.width + f;
+    const uint idxX = uint(floorf(vRelativeReferencePos_px.x+vMicroImageCenter_px.x + 0.5f));
+    const uint idxY = uint(floorf(vRelativeReferencePos_px.y+vMicroImageCenter_px.y + 0.5f));
+    const uint index = idxY*globalParams.width + idxX;
 
     if ((index < globalParams.width*globalParams.height)
         &&(vRelativeReferencePos_px.length() + float(t_intHWS) < globalParams.descrMla.fMicroImageDiam_MLDistFrac *globalParams.descrMla.fMicroLensDistance_px/2.0f))
@@ -496,9 +496,10 @@ __global__ void computeDisparity_refine(float * outputData, float* outputWeights
 
     // compute curvature at cost minimum
     float fCurvature=0;
-    if ((bestIdx > 0)&&(bestIdx < t_CNTDISPSTEPS-1))
+    if ((bestIdx > 1)&&(bestIdx < t_CNTDISPSTEPS-2))
     {
-        fCurvature = (f[bestIdx-1] -  f[bestIdx] + f[bestIdx+1] - f[bestIdx]) / fDisparityStepsize_px;
+        //fCurvature = f[bestIdx];
+        fCurvature = fabsf(f[bestIdx+1] - 2.0f*f[bestIdx] + f[bestIdx-1]) / (fDisparityStepsize_px*fDisparityStepsize_px);
     }
 
     // Only write output for valid image boundaries and microlens areas

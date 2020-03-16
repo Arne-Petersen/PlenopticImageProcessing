@@ -344,7 +344,7 @@ void PIP::CVignettingNormalization_CUDA::_NormalizeImage(PIP::CVImage_sptr& spNo
 
     // Get scale for image to map selected bin to std::numeric_limits<OUTPUTTYPE>::max() or 1.0f if output is float
     // scale to  HISTBINMAXVAL * float(itBins) / float(HISTBINCOUNT)  in float normalized imagte
-    const float fValueScale = 0.7f*fDataOutMaxVal;//fDataOutMaxVal * float(HISTBINCOUNT) / (float(itBins)*HISTBINMAXVAL);
+    const float fValueScale = fDataOutMaxVal * float(HISTBINCOUNT) / (float(itBins)*HISTBINMAXVAL);//0.7f*fDataOutMaxVal;//
     // Allocate GPU array for output image. Copy-to-host to spNormalizedImage is applied on destruction of cuda image
     CCUDAImageArray<OUTPUTTYPE> cudaImage_Normalized(spNormalizedImage);
     switch (spRawImage->CvMat().channels())

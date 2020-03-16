@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Copyright 2019 Arne Petersen, Kiel University
  *
  *    Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
@@ -52,11 +52,14 @@
 #define PT_SLIDER_OUTPUT_DISPLACEX "Output Displace X"
 #define PT_SLIDER_OUTPUT_DISPLACEY "Output Displace Y"
 #define PT_SLIDER_OUTPUT_DISPLACEZ "Output Displace Z"
+#define PT_SLIDER_OUTPUT_MINDISP "Min Disparity"
+#define PT_SLIDER_OUTPUT_MAXDISP "Max Disparity"
 
 #define PT_SLIDER_ESTIMATOR_MINCURVE "Min Curvature"
 #define PT_SLIDER_ESTIMATOR_MAXDISPDELTA "Max Disp Difference"
 #define PT_SLIDER_ESTIMATOR_MINDISP "Min Disparity"
 #define PT_SLIDER_ESTIMATOR_MAXDISP "Max Disparity"
+#define PT_SLIDER_ESTIMATOR_SATURATIONTOL "Staturation Tolerance"
 
 #define PT_SLIDER_MLA_GRIDROT "Grid Rot"
 #define PT_SLIDER_MLA_MLENSDIST "ML distance"
@@ -178,12 +181,13 @@ QtPlenopticTools::MainWindow::MainWindow(QWidget *parent) :
     m_pSliderWidget->AddSlider(PT_SLIDER_ESTIMATOR_MAXDISPDELTA, "maximum difference between disparities if crosscheck", 1.0, 0.0, 10.0, 10000);
     m_pSliderWidget->AddSlider(PT_SLIDER_ESTIMATOR_MINDISP, "minimum depth in normalized disparities to view (less will be blue)", CCUDADisparityEstimation_OFL_DNORMALIZED_MIN, 0.0, 1.0, 100);
     m_pSliderWidget->AddSlider(PT_SLIDER_ESTIMATOR_MAXDISP, "maximum depth in normalized disparities to view (more is yellow)", CCUDADisparityEstimation_OFL_DNORMALIZED_MAX, 0.0, 1.0, 100);
+    m_pSliderWidget->AddSlider(PT_SLIDER_ESTIMATOR_SATURATIONTOL, "fraction of pixels allowed to be staturated (after raw image normalization)", 0.05, 0.0, 0.5, 1000);
     // ... parameters controling MLA and main lens
     m_descrMLA.Reset();
     m_descrMLA.fMicroImageDiam_MLDistFrac = 0.95f; // omit outer 5percent of micro images as default
     m_pSliderWidget->AddGroupLabel(":2group", "MLA settings", "description of MLA properties.");
     m_pSliderWidget->AddSlider(PT_SLIDER_MLA_GRIDROT, "Rotation of MLA in [rad] with respect to images x-axis.",
-                               m_descrMLA.fGridRot_rad, -MATHCONST_PI/20.0, MATHCONST_PI/20.0, 10000);
+                               m_descrMLA.fGridRot_rad, -MATHCONST_PI/2.0, MATHCONST_PI/2.0, 100000);
     m_pSliderWidget->AddSlider(PT_SLIDER_MLA_MLENSDIST, "Distance between two micro lenses in [px]",
                                m_descrMLA.fMicroLensDistance_px, 0, 100, 20000);
     m_pSliderWidget->AddSlider(PT_SLIDER_MLA_MLIMAGESCALE, "Scale between micro lens grid and micro image grid",
@@ -368,6 +372,11 @@ void QtPlenopticTools::MainWindow::OnSliderValue_changed(const QString& strIdent
             // Recolor and re-filter and display
             _DisplayColoredDepth();
         }
+    }
+    else if (strIdentifier == PT_SLIDER_ESTIMATOR_SATURATIONTOL)
+    {
+        // Work image has to be re-normalized to apply new histogram stretch
+        _UpdateWorkImages();
     }
     else if ((strIdentifier == PT_SLIDER_OUTPUT_WIDTH)||(strIdentifier == PT_SLIDER_OUTPUT_HEIGHT)
              ||(strIdentifier == PT_SLIDER_OUTPUT_SENSORWIDTH)
@@ -663,7 +672,7 @@ void QtPlenopticTools::MainWindow::_ImportImage(const std::string strFilemame, c
     // Try read plain input image
     CVImage_sptr spImage = std::make_shared<CVImage>();
 
-    CDataIO::ImportImage(*spImage, strFilemame);
+    CDataIO::ImportImage(*spImage, strFilemame, true);
 
     // ... no throw, image imported successfully
 
@@ -698,10 +707,10 @@ void QtPlenopticTools::MainWindow::_ImportImage(const std::string strFilemame, c
     }
 
     // Add alpha channel to RGB images, keep mono or mono+alpha images
-    if (spImage->CvMat().channels() == 3)
-    {
-        CDataIO::ImageToRGBA(*spImage, *spImage);
-    }
+    //    if (spImage->CvMat().channels() == 3)
+    //    {
+    //        CDataIO::ImageToRGBA(*spImage, *spImage);
+    //    }
 
     // Is this raw or vignetting image?
     if (flagIsVignetting == false)
@@ -958,17 +967,22 @@ void QtPlenopticTools::MainWindow::_ComputeFusion()
         m_pDepthFiller->Fill(m_spDepth2D);
     }
 
-    // Set parameters for AiF generation
-    m_pAiFSynthesizer->SetParameters(m_descrMLA, projTarget, mapParams);
-    // Discard simple AiF from unprojection and set output type as uchar (image view doesn't support more).
-    m_spAllInFocus->Reinit(projTarget.vecRes.x, projTarget.vecRes.y, CV_8UC4, EImageType::RGBA);
-    // Call AiF image fusion
-    m_pAiFSynthesizer->SynthesizeAiF(m_spAllInFocus, m_spDepth2D, m_spWorkRawImage);
-
-    // needed for displaying image if output is set to be float (std output of UnprojectDisparities)
-    //m_spAllInFocus->CvMat().convertTo(m_spAllInFocus->CvMat(), CV_8UC3, 255.0f);
-    //m_spAllInFocus->descrMetaData.eImageType = EImageType::RGB;
-
+    if (true)
+    {
+        // Set parameters for AiF generation
+        m_pAiFSynthesizer->SetParameters(m_descrMLA, projTarget, mapParams);
+        // Discard simple AiF from unprojection and set output type as uchar (image view doesn't support more).
+        m_spAllInFocus->Reinit(projTarget.vecRes.x, projTarget.vecRes.y, CV_8UC4, EImageType::RGBA);
+        // Call AiF image fusion
+        m_pAiFSynthesizer->SynthesizeAiF(m_spAllInFocus, m_spDepth2D, m_spWorkRawImage);
+    }
+    else
+    {
+        // needed for displaying image if output is set to be float (std output of UnprojectDisparities)
+        m_spAllInFocus->CvMat().convertTo(m_spAllInFocus->CvMat(), CV_8UC3, 255.0f);
+        m_spAllInFocus->descrMetaData.eImageType = EImageType::RGB;
+    }
+    
     ui->graphicsViewThirdImage->SetImage(*m_spAllInFocus);
 
     // Draw colored 2D depthmap
@@ -1331,9 +1345,11 @@ void QtPlenopticTools::MainWindow::_UpdateWorkImages(const bool flagDrawImages)
         if (m_spRawImage != nullptr)
         {
             m_spWorkRawImage = CVImage_sptr(new CVImage(m_spRawImage->GetImageDataDescriptor()));
+
+            const double dblSaturationTolerance = m_pSliderWidget->GetValue(PT_SLIDER_ESTIMATOR_SATURATIONTOL);
             CVignettingNormalization_CUDA::NormalizeImage(m_spWorkRawImage, m_spRawImage, m_spVignettingImage,
-                                                          1.0f, m_descrMLA);
-            _AppendText("OnImageSent : Applied de-vignetting to raw input image.");
+                                                          1.0f - float(dblSaturationTolerance), m_descrMLA);
+            _AppendText("OnImageSent : Applied de-vignetting to raw input image with staturation tolerance " + std::to_string(1.0-dblSaturationTolerance) + ".");
 
             // Convert ALL work images to RGBA (apply debayering if needed)
             CDataIO::ImageToRGBA(*m_spWorkRawImage, *m_spWorkRawImage);
