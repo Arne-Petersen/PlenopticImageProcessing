@@ -176,7 +176,7 @@ void CDataIO::ExportImage(const CVImage& img, const std::string strFilename)
              || (img.descrMetaData.eImageType == EImageType::COLOREDDEPTH))
     {
         cv::Mat matBGRA;
-        cv::cvtColor(img.CvMat(), matBGRA, CV_RGBA2BGRA);
+        cv::cvtColor(img.CvMat(), matBGRA, cv::COLOR_RGBA2BGRA);
         if (cv::imwrite(strFilename, matBGRA) == false)
             throw CRuntimeException("OpenCV error writing RGBA image.");
         return;
