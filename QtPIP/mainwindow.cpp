@@ -39,6 +39,8 @@
 #include <QFileDialog>
 #include <QMessageBox>
 
+#include <fstream>
+
 #include <opencv2/opencv.hpp>
 
 
