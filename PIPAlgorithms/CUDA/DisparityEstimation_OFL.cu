@@ -617,14 +617,32 @@ void CCUDADisparityEstimation_OFL::EstimateDisparities(CVImage_sptr& spDispartie
         throw CRuntimeException(std::string("PIP::CCUDADisparityEstimation_OFL::Estimate : CUDA arrOutWeightSum memset : \"") + std::string(cudaGetErrorString(e)));
     }
 
+	// Get maximum values for cuda kernel configuration
+	int intBlockSize;
+	int intMinGridSize;
+	if (spPlenopticImage->CvMat().channels() == 1)
+	{
+		cudaOccupancyMaxPotentialBlockSize(&intMinGridSize, &intBlockSize, computeDisparity<DISPSTEPS_INITIAL, HWS_INITIAL, 1, EGridType::HEXAGONAL>, 0, 0);
+	}
+	else if (spPlenopticImage->CvMat().channels() == 2)
+	{
+		cudaOccupancyMaxPotentialBlockSize(&intMinGridSize, &intBlockSize, computeDisparity<DISPSTEPS_INITIAL, HWS_INITIAL, 2, EGridType::HEXAGONAL>, 0, 0);
+	}
+	else
+	{
+		cudaOccupancyMaxPotentialBlockSize(&intMinGridSize, &intBlockSize, computeDisparity<DISPSTEPS_INITIAL, HWS_INITIAL, 4, EGridType::HEXAGONAL>, 0, 0);
+	}
+	// convert absolute block size to square length
+	intBlockSize = int(floor(sqrt(float(intBlockSize))));
+
     // Diameter of full lens in number of pixels
     //    descrMLA.fMicroLensDistance_px is distance between projection centers. Use scaled radius of mirco image distance
     const int intNumFullLensPixel = int(ceil(m_params.descrMla.fMlaImageScale * m_params.descrMla.fMicroLensDistance_px));
-    // If lenses are larger than 31 pixel, CUDA kernel cannot cover full lens. Apply partitioning to 31x31 blocks
-    const int intNumPixelX = min(intNumFullLensPixel, 31);
+    // If lenses are larger than max block size pixel, CUDA kernel cannot cover full lens. Apply partitioning to blocks
+    const int intNumPixelX = min(intNumFullLensPixel, intBlockSize);
     const int intNumPixel = intNumPixelX*intNumPixelX;
-    // Number of blocks in partition in x and y direction respectively. For lenses <32 pixel diameter 1x1 blocks are used...
-    const int intNumBlocks = intNumFullLensPixel / 32 + 1;
+    // Number of blocks in partition in x and y direction respectively. For lenses < blocksize pixel diameter 1x1 blocks are used...
+    const int intNumBlocks = intNumFullLensPixel / (intBlockSize+1) + 1;
 
     // Number of lenses in X-axis of ! MLA !
     const int intNumLensXdir = int(ceil( float(spPlenopticImage->cols()) / (m_params.descrMla.fMlaImageScale * m_params.descrMla.fMicroLensDistance_px) ));
