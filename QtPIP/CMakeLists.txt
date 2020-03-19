@@ -17,7 +17,10 @@
 ##    SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.#pragma once
 ## 
 
-cmake_policy(SET CMP0100 NEW)
+if(NOT ${CMAKE_VERSION} VERSION_LESS "3.17.0") 
+	message(STATUS "using new CMP0100 policy")
+    cmake_policy(SET CMP0100 NEW)
+endif()
 
 # Find includes in the build directories
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
