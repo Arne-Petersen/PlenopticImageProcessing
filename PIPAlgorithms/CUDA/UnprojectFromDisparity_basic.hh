@@ -47,8 +47,8 @@ public:
     {
         m_descrMLA = descrMLA;
         m_projTarget = projTarget;
-        m_fMinNormedDisp = StdMapTestAndGet(mapAdditionalParams, "Min Disparity");
-        m_fMaxNormedDisp = StdMapTestAndGet(mapAdditionalParams, "Max Disparity");
+        m_fMinNormedDisp = float(StdMapTestAndGet(mapAdditionalParams, "Min Disparity"));
+        m_fMaxNormedDisp = float(StdMapTestAndGet(mapAdditionalParams, "Max Disparity"));
     }
 
     ///

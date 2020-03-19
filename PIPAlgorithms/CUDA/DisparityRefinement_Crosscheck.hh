@@ -45,7 +45,7 @@ public:
                                const std::map<std::string,double>& mapAdditionalParams) override
     {
         m_descMla = descrMLA;
-        m_fMaxNormalizedDispDeviation = StdMapTestAndGet(mapAdditionalParams, "Max Disp Difference");
+        m_fMaxNormalizedDispDeviation = float(StdMapTestAndGet(mapAdditionalParams, "Max Disp Difference"));
     }
 
     ///

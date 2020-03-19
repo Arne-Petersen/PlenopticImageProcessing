@@ -91,9 +91,9 @@ public:
         m_params.descrMla = descrMLA;
 
         // Direct parameters settings
-        m_params.fMinDisparity = StdMapTestAndGet(mapAdditionalParams, "Min Disparity");
-        m_params.fMaxDisparity = StdMapTestAndGet(mapAdditionalParams, "Max Disparity");
-        m_params.fMinCurvature = StdMapTestAndGet(mapAdditionalParams, "Min Curvature");
+        m_params.fMinDisparity = float(StdMapTestAndGet(mapAdditionalParams, "Min Disparity"));
+        m_params.fMaxDisparity = float(StdMapTestAndGet(mapAdditionalParams, "Max Disparity"));
+        m_params.fMinCurvature = float(StdMapTestAndGet(mapAdditionalParams, "Min Curvature"));
 
         // Derived parameters
         // refinement range : two disparity steps before and 2 after initial estimate
