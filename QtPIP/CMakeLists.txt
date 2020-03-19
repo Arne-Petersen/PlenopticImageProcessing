@@ -17,6 +17,8 @@
 ##    SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.#pragma once
 ## 
 
+cmake_policy(SET CMP0100 NEW)
+
 # Find includes in the build directories
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 

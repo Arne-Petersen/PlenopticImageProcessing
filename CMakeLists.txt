@@ -65,6 +65,21 @@ SET(LIBRARY_OUTPUT_PATH "${PLENOPTICIMAGEPROCESSING_BINARY_DIR}/lib/" CACHE PATH
 SET(BINARY_OUTPUT_PATH "${PLENOPTICIMAGEPROCESSING_BINARY_DIR}/bin/" CACHE PATH "Single output directory for all shared libraries")
 SET(EXECUTABLE_OUTPUT_PATH "${PLENOPTICIMAGEPROCESSING_BINARY_DIR}/bin/" CACHE PATH "Single output directory for all executables")
 
+IF (WIN32)
+  # avoid subfolder structure from VisualStudio.
+  #   Debug builds append 'D' and don't have to use different directories
+  #   32bit architecture is not supported by this project
+  set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+  set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+ENDIF (WIN32)
+
+# subdirs appended to CMAKE_INSTALL_PREFIX for INSTALL target
+SET(INSTALL_INCLUDE_SUBDIR "include/")
+SET(INSTALL_ARCHIVE_SUBDIR "lib/")
+SET(INSTALL_LIBRARY_SUBDIR "lib/")
+SET(INSTALL_RUNTIME_SUBDIR "bin/")
+
 # Add documentation target for Doxygen
 OPTION(TARGET_DOC "create doc - doxygen docu target?" OFF)
 IF   (TARGET_DOC)
