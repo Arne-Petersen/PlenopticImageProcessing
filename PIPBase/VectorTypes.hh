@@ -14,7 +14,7 @@
  *    LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
  *    NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
  *    WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
- *    SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.#pragma once
+ *    SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
 #pragma once
@@ -22,18 +22,16 @@
 #include <cstddef>
 #include <math.h>
 
-#ifdef MODULEFRAMEWORK_HAS_CUDA
 #include "cuda.h"
 #include "cuda_runtime.h"
-#else
-// set empty CUDA defines
+
+// set empty CUDA defines if needed
 #ifndef __device__
 #define __device__
 #endif
 #ifndef __host__
 #define  __host__
 #endif
-#endif // MODULEFRAMEWORK_HAS_CUDA
 
 namespace PIP
 {

@@ -14,7 +14,7 @@
  *    LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
  *    NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
  *    WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
- *    SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.#pragma once
+ *    SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
 #pragma once
@@ -31,7 +31,7 @@
 #endif
 #endif //__NVCC__
 
-// Frequently used for hexagonal structures
+// Frequently used for hexagonal structures = sin(1/3 * pi)
 #define SINPIBYTHREE 0.8660254037844386467637231707529361835
 
 #include "MatrixTransforms.hh"
@@ -128,14 +128,14 @@ namespace PIP
         ///
         float fMicroLensPrincipalDist_px;
 
-        ///
-        /// \brief mtMlaPose position and orientation of MLA relative to main lens (mm metrics)
-        ///
-        MTEuclid3<float> mtMlaPose_L_MLA;
-
         ////////////////////////////////////////////////////////////////////////////////////////////////////
         ///                              MAIN LENSE DESCRIPTION
         ////////////////////////////////////////////////////////////////////////////////////////////////////
+
+       ///
+        /// \brief mtMlaPose position and orientation of MLA relative to main lens (mm metrics)
+        ///
+        MTEuclid3<float> mtMlaPose_L_MLA;
 
         ///
         /// \brief fMainLensFLength focal length of main lens in [mm]
@@ -182,7 +182,7 @@ namespace PIP
         ///
         /// \brief GetfMicroImageDistance_px returns distance between 2 directly neighboring micro images.
         ///
-        /// This is the micro lens distance scaled by MLA image scale.
+        /// This is the micro image distance scaled by MLA image scale.
         ///
         __host__ __device__ float GetfMicroImageDistance_px() const
         {
@@ -192,13 +192,13 @@ namespace PIP
         ///
         /// \brief SetMainLens sets basic properties of mainlens
         /// \param fLength_mm focal length in mm
-        /// \param fMlaDist_mm distance main lens to MLA
+        /// \param fMainLensToMlaDist_mm distance main lens to MLA
         ///
-        __host__ __device__ void SetMainLens(const float fLength_mm, const float fMlaDist_mm)
+        __host__ __device__ void SetMainLens(const float fLength_mm, const float fMainLensToMlaDist_mm)
         {
             fMainLensFLength_mm = fLength_mm;
             mtMlaPose_L_MLA = MTEuclid3<float>::Identity();
-            mtMlaPose_L_MLA.t_rl_l.z = fMlaDist_mm;
+            mtMlaPose_L_MLA.t_rl_l.z = fMainLensToMlaDist_mm;
         }
 
         ///
@@ -603,6 +603,8 @@ namespace PIP
         ///                                       to depth in object space in [mm]
         /// \param fDisparity_baselines normalized disparity
         /// \return depth in mm
+		///
+		/// NOTE: This is only an approximation using the thin lens euqation.
         ///
         template<const enum EGridType TGridType>
         __host__ __device__ float MapDisparityToObjectSpaceDepth(const float fDisparity_baselines)
@@ -623,6 +625,8 @@ namespace PIP
         ///                                       to depth in object space in [mm], HOST ONLY.
         /// \param fDisparity_baselines normalized disparity
         /// \return depth in mm
+		///
+		/// NOTE: This is only an approximation using the thin lens euqation.
         ///
         __host__ float MapDisparityToObjectSpaceDepth(const float fDisparity_baselines)
         {
