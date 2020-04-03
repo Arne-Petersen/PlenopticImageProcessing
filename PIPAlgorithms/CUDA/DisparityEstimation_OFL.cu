@@ -617,23 +617,24 @@ void CCUDADisparityEstimation_OFL::EstimateDisparities(CVImage_sptr& spDispartie
         throw CRuntimeException(std::string("PIP::CCUDADisparityEstimation_OFL::Estimate : CUDA arrOutWeightSum memset : \"") + std::string(cudaGetErrorString(e)));
     }
 
-	// Get maximum values for cuda kernel configuration
+	// Get maximum width of square-sized CUDA thread block (depending on thread and shared mem capabilities)
 	int intBlockSize;
-	int intMinGridSize;
-	if (spPlenopticImage->CvMat().channels() == 1)
 	{
-		cudaOccupancyMaxPotentialBlockSize(&intMinGridSize, &intBlockSize, computeDisparity<DISPSTEPS_INITIAL, HWS_INITIAL, 1, EGridType::HEXAGONAL>, 0, 0);
+		// get max thread counts and shared memory size per block
+		int intMaxBlockDimX, intMaxBlockDimY, intMaxBlockSize, intMaxSharedMem, intMaxThreads;
+		cudaDeviceGetAttribute(&intMaxBlockDimX, cudaDevAttrMaxBlockDimX, 0);
+		cudaDeviceGetAttribute(&intMaxBlockDimY, cudaDevAttrMaxBlockDimY, 0);
+		cudaDeviceGetAttribute(&intMaxThreads, cudaDevAttrMaxThreadsPerBlock, 0);
+		cudaDeviceGetAttribute(&intMaxSharedMem, cudaDevAttrMaxSharedMemoryPerBlock, 0);
+
+		// get max width of square-sized block ( sqrt(min(maxthreadsX,maxthreadsY,maxthreads))  )
+		intMaxBlockSize = int(sqrtf(float( min(intMaxThreads, min(intMaxBlockDimX, intMaxBlockDimY)) )));
+		// get maximum possible width of square-sized block for given stepcount and available shared mem
+		int intSharedMemStepBlockSize = int(floorf(sqrtf(float(intMaxSharedMem/(4* DISPSTEPS_REFINE)))));
+
+		// choose minimum of upper limits
+		intBlockSize = min(intMaxBlockSize, intSharedMemStepBlockSize);
 	}
-	else if (spPlenopticImage->CvMat().channels() == 2)
-	{
-		cudaOccupancyMaxPotentialBlockSize(&intMinGridSize, &intBlockSize, computeDisparity<DISPSTEPS_INITIAL, HWS_INITIAL, 2, EGridType::HEXAGONAL>, 0, 0);
-	}
-	else
-	{
-		cudaOccupancyMaxPotentialBlockSize(&intMinGridSize, &intBlockSize, computeDisparity<DISPSTEPS_INITIAL, HWS_INITIAL, 4, EGridType::HEXAGONAL>, 0, 0);
-	}
-	// convert absolute block size to square length
-	intBlockSize = int(floor(sqrt(float(intBlockSize))));
 
     // Diameter of full lens in number of pixels
     //    descrMLA.fMicroLensDistance_px is distance between projection centers. Use scaled radius of mirco image distance
