@@ -199,7 +199,7 @@ void PIP::CVignettingNormalization_CUDA::_NormalizeImage(PIP::CVImage_sptr& spNo
     cudaEventRecord(start);
 
     // create temporary float GPU array for float valued normalized image (nullptr causes no up/download to/from GPU)
-    CCUDADataArray<float> cudaImageArray_Normalized(nullptr, spRawImage->elementcount(), CCUDADataArray<float>::EMemTransferType::NONE);
+    CCUDADataArray<float> cudaImageArray_Normalized(nullptr, spRawImage->elementcount(), ECUDAMemTransferType::NONE);
     switch (spRawImage->CvMat().channels())
     {
       case 1:
@@ -271,7 +271,7 @@ void PIP::CVignettingNormalization_CUDA::_NormalizeImage(PIP::CVImage_sptr& spNo
     memset((void *) puHistArray, 0, HISTBINCOUNT*sizeof(uint));
     {
         // use local block for histogram CUDA array. desctructor copies device to host memory. Use INOUT to copy zeroed array
-        CCUDADataArray<uint> cudaArrHistogram(&(puHistArray[0]), HISTBINCOUNT, CCUDADataArray<uint>::EMemTransferType::INOUT);
+        CCUDADataArray<uint> cudaArrHistogram(&(puHistArray[0]), HISTBINCOUNT, ECUDAMemTransferType::INOUT);
         switch (spRawImage->CvMat().channels())
         {
           case 1:
