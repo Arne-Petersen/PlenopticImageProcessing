@@ -20,6 +20,8 @@
 #include "AllInFocusSynthesis.hh"
 #include "CudaMinifuncs.cuh"
 
+#define WRITEINVALIDPIXELBLACK
+
 using namespace PIP;
 
 struct SLocalParams
@@ -66,7 +68,18 @@ __global__ void computeImageSynthesis(OUTPUTSTORAGETYPE* outputSynthImage,
     // Depth from 2.5D depthmap corresponding to \ref globalParams.projTarget
     float fDepthMM = tex2D<float>(texInputDepth2D, vPixelPos_px.x + 0.5f, vPixelPos_px.y + 0.5f);
     // Skip invalid depths
-    if (fDepthMM == 0.0f) return;
+	if (fDepthMM == 0.0f)
+	{
+#ifdef WRITEINVALIDPIXELBLACK
+		int index = 4 * ((blockIdx.y*blockDim.y + threadIdx.y) * globalParams.projTarget.vecRes.x + (blockIdx.x*blockDim.x + threadIdx.x));
+		outputSynthImage[index + 0] = 0;
+		outputSynthImage[index + 1] = 0;
+		outputSynthImage[index + 2] = 0;
+		outputSynthImage[index + 3] = (OUTPUTSTORAGETYPE)(fOutputTypeScale);
+#endif //WRITEINVALIDPIXELBLACK
+
+		return;
+	}
 
     // Get 3space position relative to mainlens
     const vec3<float> vPos3D_mainlens_MM = globalParams.projTarget.Unproject(vPixelPos_px, fDepthMM);
@@ -99,6 +112,15 @@ __global__ void computeImageSynthesis(OUTPUTSTORAGETYPE* outputSynthImage,
     if ((vRawLfPix_px.x < float(globalParams.vUpperLeft.x)) || (vRawLfPix_px.y < float(globalParams.vUpperLeft.y))
         || (vRawLfPix_px.x > float(globalParams.vLowerRight.x)) || (vRawLfPix_px.y > float(globalParams.vLowerRight.y)))
     {
+#ifdef WRITEINVALIDPIXELBLACK
+		int index = 4 * ((blockIdx.y*blockDim.y + threadIdx.y) * globalParams.projTarget.vecRes.x + (blockIdx.x*blockDim.x + threadIdx.x));
+		outputSynthImage[index + 0] = 0;
+		outputSynthImage[index + 1] = 0;
+		outputSynthImage[index + 2] = 0;
+		outputSynthImage[index + 3] = (OUTPUTSTORAGETYPE)(fOutputTypeScale);
+#endif // WRITEINVALIDPIXELBLACK
+
+
         return;
     }
 
@@ -115,6 +137,7 @@ __global__ void computeImageSynthesis(OUTPUTSTORAGETYPE* outputSynthImage,
         vlCol.z += vlRCol.w * vlRCol.z;
         vlCol.w += vlRCol.w;
     }
+
     // Add color from neighbor lenses
     for (int i=0; i<6; i++)
     {
@@ -127,19 +150,20 @@ __global__ void computeImageSynthesis(OUTPUTSTORAGETYPE* outputSynthImage,
         // Reject pixel if out-of-lens border
         const float fIsIn = float((vRawLfPix_px - globalParams.descrMla.GetMicroImageCenter_px<t_eGridType>(vfTargetLensIndex)).length()
                                   < (0.5f*globalParams.descrMla.fMicroImageDiam_MLDistFrac*globalParams.descrMla.fMicroLensDistance_px));
+
         // Read color and add to weighted average
         const float4 vlRCol = getRGBAcolor<t_intChannels>(vRawLfPix_px, texInputPlenopticImage);
         vlCol.x += fIsIn * vlRCol.w * vlRCol.x;
         vlCol.y += fIsIn * vlRCol.w * vlRCol.y;
         vlCol.z += fIsIn * vlRCol.w * vlRCol.z;
         vlCol.w += fIsIn * vlRCol.w;
-    }
+	}
 
     // get index in pixel array (output always four channel RGBA)
     int index = 4 * ((blockIdx.y*blockDim.y + threadIdx.y) * globalParams.projTarget.vecRes.x + (blockIdx.x*blockDim.x + threadIdx.x));
     // Copy generated color value to all channels, set alpha channel (use aas weights in input)
     vlCol.w = (vlCol.w == 0) ? 1.0f : vlCol.w;
-    outputSynthImage[index + 0] = (OUTPUTSTORAGETYPE)(fOutputTypeScale*(vlCol.x / vlCol.w));
+	outputSynthImage[index + 0] = (OUTPUTSTORAGETYPE)(fOutputTypeScale*(vlCol.x / vlCol.w));
     outputSynthImage[index + 1] = (OUTPUTSTORAGETYPE)(fOutputTypeScale*(vlCol.y / vlCol.w));
     outputSynthImage[index + 2] = (OUTPUTSTORAGETYPE)(fOutputTypeScale*(vlCol.z / vlCol.w));
     outputSynthImage[index + 3] = (OUTPUTSTORAGETYPE)(fOutputTypeScale);
