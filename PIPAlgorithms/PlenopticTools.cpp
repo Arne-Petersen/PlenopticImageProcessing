@@ -21,8 +21,6 @@
 
 #include "opencv2/opencv.hpp"
 
-#include "./CUDA/MedianFill.hh"
-
 using namespace PIP;
 
 void CPlenopticTools::DrawGridToImage(CVImage_sptr& spImage, const SPlenCamDescription &descrMLA)
@@ -32,9 +30,6 @@ void CPlenopticTools::DrawGridToImage(CVImage_sptr& spImage, const SPlenCamDescr
         throw CRuntimeException("DrawGridToImage only implemented for uchar images.",
                                 ERuntimeExcpetionType::ILLEGAL_ARGUMENT);
     }
-
-	CCUDAMedianFill fl;
-	fl.Fill(spImage);
 
     const int intImageWidth = spImage->cols();
     const int intImageHeight = spImage->rows();
