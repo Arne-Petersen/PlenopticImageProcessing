@@ -19,6 +19,9 @@
 
 #include "CudaHelper.hh"
 
+#include "../CUDAImageArray.hh"
+#include "../CUDAImageTexture.hh"
+
 
 __global__ void computeDummy(float* inout, cudaTextureObject_t texInput, int width, int height)
 {
@@ -59,7 +62,7 @@ void PIP_InitializeCUDA()
     cudaError_t e;
     if ((e = cudaGetLastError()) != 0)
     {
-        throw CRuntimeException(std::string("CCUDAMicrolensFusion::Unproject : CUDA 'computeUnproject' launch error : \"") + std::string(cudaGetErrorString(e)));
+        throw CRuntimeException(std::string("PIP_InitializeCUDA : CUDA 'computeDummy' launch error : \"") + std::string(cudaGetErrorString(e)));
     }
 
     // Query runtime

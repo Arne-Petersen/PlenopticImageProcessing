@@ -18,9 +18,14 @@
 ## 
 
 # Add CUDA source files
-SET(PIPInterOpCUDA_SRCS CUDA/CudaHelper.hh CUDA/CudaHelper.cu)
+SET(PIPInterOpCUDA_CUDA_SRCS CUDA/CudaHelper.hh CUDA/CudaHelper.cu)
 # Add library for static linking
-ADD_LIBRARY(PIPInterOpCUDA STATIC ${PIPInterOpCUDA_SRCS})
+ADD_LIBRARY(PIPInterOpCUDA_CUDA STATIC ${PIPInterOpCUDA_CUDA_SRCS})
 # Enable c++11 in CUDA compile. 'should' have been inherited from host compiler
-SET_PROPERTY(TARGET PIPInterOpCUDA PROPERTY CUDA_STANDARD 11)
+SET_PROPERTY(TARGET PIPInterOpCUDA_CUDA PROPERTY CUDA_STANDARD 11)
 
+# Add C++ sources
+SET(PIPInterOpCUDA_SRCS CUDAImageTexture.cpp CUDAVolumeTexture.cpp CUDAImageArray.cpp CUDADataArray.cpp)
+SET(PIPInterOpCUDA_HAEDER CUDAImageTexture.hh CUDAVolumeTexture.hh CUDAImageArray.hh CUDADataArray.hh)
+PIP_ADD_LIBRARY(PIPInterOpCUDA ${PIPInterOpCUDA_SRCS} ${PIPInterOpCUDA_HAEDER})
+TARGET_LINK_LIBRARIES(PIPInterOpCUDA PIPBase PIPInterOpCUDA_CUDA)

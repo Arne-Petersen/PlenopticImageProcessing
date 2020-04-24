@@ -20,6 +20,9 @@
 #include "DisparityEstimation_OFL.hh"
 #include "CudaMinifuncs.cuh"
 
+#include "PIPInterOpCUDA/CUDAImageTexture.hh"
+#include "PIPInterOpCUDA/CUDAImageArray.hh"
+
 #ifdef WIN32
 #include <unistd.h>
 #endif // WIN32

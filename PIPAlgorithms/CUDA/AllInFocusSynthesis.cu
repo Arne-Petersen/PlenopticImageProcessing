@@ -20,6 +20,9 @@
 #include "AllInFocusSynthesis.hh"
 #include "CudaMinifuncs.cuh"
 
+#include "PIPInterOpCUDA/CUDAImageArray.hh"
+#include "PIPInterOpCUDA/CUDAImageTexture.hh"
+
 #define WRITEINVALIDPIXELBLACK
 
 using namespace PIP;

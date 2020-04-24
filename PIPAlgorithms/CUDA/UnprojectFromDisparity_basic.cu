@@ -21,6 +21,9 @@
 
 #include "CudaMinifuncs.cuh"
 
+#include "PIPInterOpCUDA/CUDAImageArray.hh"
+#include "PIPInterOpCUDA/CUDAImageTexture.hh"
+
 using namespace PIP;
 
 struct SLocalParams

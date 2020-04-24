@@ -19,6 +19,9 @@
 
 #include "DisparityRefinement_Crosscheck.hh"
 
+#include "PIPInterOpCUDA/CUDAImageArray.hh"
+#include "PIPInterOpCUDA/CUDAImageTexture.hh"
+
 #if !defined(WIN32) && !defined(_WIN32) && !defined(__WIN32)
 #include <unistd.h>
 #endif // not WIN32

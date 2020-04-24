@@ -24,6 +24,11 @@
 #define HISTBINCOUNT 10000
 #define HISTBINMAXVAL 3.0f
 
+#include "PIPInterOpCUDA/CUDAImageTexture.hh"
+#include "PIPInterOpCUDA/CUDADataArray.hh"
+#include "PIPInterOpCUDA/CUDAImageArray.hh"
+
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 template<const int t_intChannelCount>
 __global__

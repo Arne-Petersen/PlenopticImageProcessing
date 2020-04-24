@@ -19,6 +19,9 @@
 
 #include "MlaVisualization.hh"
 
+#include "PIPInterOpCUDA/CUDAImageTexture.hh"
+#include "PIPInterOpCUDA/CUDAImageArray.hh"
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 template<const int t_intChannelCount, const PIP::EGridType t_eGridType, typename OUTPUTSTORAGETYPE>
 __global__

@@ -25,6 +25,9 @@
 
 #include "PIPAlgorithms/CUDA/CudaMinifuncs.cuh"
 
+#include "PIPInterOpCUDA/CUDAImageArray.hh"
+#include "PIPInterOpCUDA/CUDAImageTexture.hh"
+
 using namespace PIP;
 
 ///
@@ -268,6 +271,20 @@ void CCUDADisparityEstimation_basic::EstimateDisparities(CVImage_sptr& spDispart
     {
         throw CRuntimeException(std::string("PIP::CCUDADisparityEstimation_OFL::Estimate : CUDA arrOutWeightSum memset : \"") + std::string(cudaGetErrorString(e)));
     }
+
+	// Get maximum width of square-sized CUDA thread block (depending on GPU capabilities)
+	//int intMaxBlockSize;
+	//{
+	//	// get max thread counts and shared memory size per block
+	//	int intMaxBlockDimX, intMaxBlockDimY, intMaxThreads;
+	//	cudaDeviceGetAttribute(&intMaxBlockDimX, cudaDevAttrMaxBlockDimX, 0);
+	//	cudaDeviceGetAttribute(&intMaxBlockDimY, cudaDevAttrMaxBlockDimY, 0);
+	//	cudaDeviceGetAttribute(&intMaxThreads, cudaDevAttrMaxThreadsPerBlock, 0);
+
+	//	// get max width of square-sized block ( sqrt(min(maxthreadsX,maxthreadsY,maxthreads))  )
+	//	intMaxBlockSize = int(sqrtf(float(min(intMaxThreads, min(intMaxBlockDimX, intMaxBlockDimY)))));
+	//}
+
 
     // Diameter of full lens in number of pixels
     //    descrMLA.fMicroLensDistance_px is distance between projection centers. Use scaled radius of mirco image distance
