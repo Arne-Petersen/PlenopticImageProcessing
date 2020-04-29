@@ -63,7 +63,7 @@ namespace PIP
 		///
 		/// \brief UpdateHost copies CUDA memory to host image (even if transfer type is INPUT only)
 		///
-		inline void UpdateHost();
+		void UpdateHost();
 
 		///
 		/// \brief GetDevicePointer returns pointer to allocated CUDA device memory
