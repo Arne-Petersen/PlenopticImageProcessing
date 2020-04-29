@@ -60,8 +60,8 @@ CCUDADataArray<DATATYPE>::~CCUDADataArray()
 
 namespace PIP
 {
-	template<> class CCUDADataArray<float>;
-	template<> class CCUDADataArray<unsigned>;
-	template<> class CCUDADataArray<unsigned short>;
-	template<> class CCUDADataArray<unsigned char>;
+	template class CCUDADataArray<float>;
+	template class CCUDADataArray<unsigned>;
+	template class CCUDADataArray<unsigned short>;
+	template class CCUDADataArray<unsigned char>;
 }

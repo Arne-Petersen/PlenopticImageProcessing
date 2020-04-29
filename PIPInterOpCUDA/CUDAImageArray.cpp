@@ -144,8 +144,8 @@ void CCUDAImageArray<IMAGEDATATYPE>::__FreeCUDA(const bool flagSkipCopyToHost)
 
 namespace PIP
 {
-	template<> class CCUDAImageArray<float>;
-	template<> class CCUDAImageArray<unsigned>;
-	template<> class CCUDAImageArray<unsigned short>;
-	template<> class CCUDAImageArray<unsigned char>;
+	template class CCUDAImageArray<float>;
+	template class CCUDAImageArray<unsigned>;
+	template class CCUDAImageArray<unsigned short>;
+	template class CCUDAImageArray<unsigned char>;
 }
