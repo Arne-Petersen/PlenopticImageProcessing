@@ -20,9 +20,9 @@ The whole software is dependend only on a few external software packages. This i
 
 1. OpenCV >= 3.4, minimal package (with basic image processing and IO, i.e. png, jpg, OpenEXR).
 
-2. CMake >= 3.8 (earlier might work)
+2. CMake >= 3.8 (3.17 works best for me right now -- 29.04.2020)
 
-3. CUDA (9.1 and 10 actively used, >= 8 'should' work)
+3. CUDA (9.1 and 10.[0|1|2] actively used, >= 8 'should' work)
 
 4. Compiler with full C++11 support (tested gcc-6/7, MS VisualStudio 2017) and compatible to used CUDA version
 
@@ -39,6 +39,12 @@ With a CMake consistent installation of all depoendencies, configuration "should
    
 2. use CMAKE_CXX_COMPILER and CMAKE_C_COMPILER ('ccmake' advanced config, hit 't') to select a compiler compatible to CUDA version.
    * ATTENTION : Not all compiler versions can host nvcc	(if someone has a compatibility table, please share)
+   
+3. WINDOWS OpenCV special : the OpenCV find-scrpt misses the library in some configurations. The '.lib' files in the distribution for windows often use sub directories for different visual studio versions
+   * e.g. INSTALLPATHOFOPENCVBUILD/opencv/build/x64/vc15/lib for VisualStudio 2017 builds
+   * during CMake configure browse to the respective directory containing the '.lib' files (not the DLLs in bin directory)
+
+4. WARNING for WINDOWS users : when executing the build executable within Visual Studio (i.e. debugger), the global path settings are used. That is, if program links sucessfully but DLL-errors at runtime, check the DLLs actually loaded on program start (start debugger hitting F5 - release or debug build does not matter - and see 'output' window. It will display all loaded DLLs including full path...). I.e. Qt libs often interfere with other programs using their own copy of Qt libs. Due to missing Version and build tags, windows loads the wrong DLL and basically everything can happen.
 
 ### Test data
 Test data, created using blender cycles raytracer, can be found in SampleData folder in the repository. In the [brother](https://github.com/Arne-Petersen/Plenoptic-Simulation) repository @@ you can find the blender package to create your own synthetical data. All MLA and main-lens properties can be controlled for creating realistic plenoptic images.

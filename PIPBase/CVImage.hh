@@ -329,6 +329,15 @@ public:
         return (m_pMatCvImage != nullptr) ? m_pMatCvImage->type() : -1;
     }
 
+	///
+	/// \brief byteperpixel returns the number of bytes used for each pixel (eg uchar 3-channel = 1*3).
+	/// \return size in byte, -1 if not initialized
+	///
+	inline int byteperpixel() const
+	{
+		return (m_pMatCvImage != nullptr) ? int(m_pMatCvImage->elemSize()) : -1;
+	}
+
     ///
     /// \brief bytecount returns the number of bytes of mats data array.
     /// \return size in byte, -1 if not initialized

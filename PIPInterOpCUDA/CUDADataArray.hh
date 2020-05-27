@@ -72,7 +72,7 @@ namespace PIP
 
 		inline int GetElementCount() const
 		{
-			return m_sizeElemCount;
+			return (int) m_sizeElemCount;
 		}
 
 		inline size_t GetElemByteSize() const

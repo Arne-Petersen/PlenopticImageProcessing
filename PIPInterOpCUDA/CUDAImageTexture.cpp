@@ -70,7 +70,11 @@ void CCUDAImageTexture::UpdaloadImage(CVImage_sptr& spImage)
 			" given image size/type differs from texture size/type.");
 	}
 	// Copy image data to cuda device array
-	cudaMemcpyToArray(m_dpImageArray, 0, 0, (void *)spImage->data(), spImage->bytecount(), cudaMemcpyHostToDevice);
+	//cudaMemcpyToArray(m_dpImageArray, 0, 0, (void *)spImage->data(), spImage->bytecount(), cudaMemcpyHostToDevice);
+	const int cntBytePerPixel = spImage->byteperpixel();
+	cudaMemcpy2DToArray(m_dpImageArray, 0, 0, (void *)spImage->data(),
+		spImage->cols() * cntBytePerPixel, spImage->cols() * cntBytePerPixel, spImage->rows(), cudaMemcpyHostToDevice);
+
 	cudaError_t e;
 	if ((e = cudaGetLastError()) != 0)
 	{
@@ -138,7 +142,11 @@ void CCUDAImageTexture::__AllocateCUDA(const CVImage_sptr& spImage, const bool f
 	}
 
 	// Copy image data to cuda device array
-	cudaMemcpyToArray(m_dpImageArray, 0, 0, (void *)spImage->data(), spImage->bytecount(), cudaMemcpyHostToDevice);
+	//cudaMemcpyToArray(m_dpImageArray, 0, 0, (void *)spImage->data(), spImage->bytecount(), cudaMemcpyHostToDevice);
+	const int cntBytePerPixel = spImage->byteperpixel();
+	cudaMemcpy2DToArray(m_dpImageArray, 0, 0, (void *)spImage->data(),
+		spImage->cols() * cntBytePerPixel, spImage->cols() * cntBytePerPixel, spImage->rows(), cudaMemcpyHostToDevice);
+
 	if ((e = cudaGetLastError()) != 0)
 	{
 		cudaFreeArray(m_dpImageArray);
