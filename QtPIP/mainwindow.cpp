@@ -54,8 +54,8 @@
 #define PT_SLIDER_OUTPUT_DISPLACEX "Output Displace X"
 #define PT_SLIDER_OUTPUT_DISPLACEY "Output Displace Y"
 #define PT_SLIDER_OUTPUT_DISPLACEZ "Output Displace Z"
-#define PT_SLIDER_OUTPUT_MINDISP "Min Disparity"
-#define PT_SLIDER_OUTPUT_MAXDISP "Max Disparity"
+#define PT_SLIDER_OUTPUT_MINDISP "Output Min Disparity"
+#define PT_SLIDER_OUTPUT_MAXDISP "Output Max Disparity"
 
 #define PT_SLIDER_ESTIMATOR_MINCURVE "Min Curvature"
 #define PT_SLIDER_ESTIMATOR_MAXDISPDELTA "Max Disp Difference"
@@ -177,12 +177,14 @@ QtPlenopticTools::MainWindow::MainWindow(QWidget *parent) :
                                projTarget.mtPose_r_c.t_rl_l.y, -100, 100, 1000);
     m_pSliderWidget->AddSlider(PT_SLIDER_OUTPUT_DISPLACEZ, "z-displacement [mm] for virtual camera",
                                projTarget.mtPose_r_c.t_rl_l.z, -50, 50, 1000);
-    // ... parameters controling raw depth estimation
+	m_pSliderWidget->AddSlider(PT_SLIDER_OUTPUT_MINDISP, "minimum depth for coloring of depth maps in view (less will be blue)", CCUDADisparityEstimation_OFL_DNORMALIZED_MIN, 0.0, 1.0, 100);
+	m_pSliderWidget->AddSlider(PT_SLIDER_OUTPUT_MAXDISP, "maximum depth for coloring of depth maps in view (more is yellow)", CCUDADisparityEstimation_OFL_DNORMALIZED_MAX, 0.0, 1.0, 100);
+	// ... parameters controling raw depth estimation
     m_pSliderWidget->AddGroupLabel(":1group", "Estimator Properties", "");
     m_pSliderWidget->AddSlider(PT_SLIDER_ESTIMATOR_MINCURVE, "minimum curvature for filtering", 0.0, 0.0, 1.0, 100);
     m_pSliderWidget->AddSlider(PT_SLIDER_ESTIMATOR_MAXDISPDELTA, "maximum difference between disparities if crosscheck", 1.0, 0.0, 10.0, 10000);
-    m_pSliderWidget->AddSlider(PT_SLIDER_ESTIMATOR_MINDISP, "minimum depth in normalized disparities to view (less will be blue)", CCUDADisparityEstimation_OFL_DNORMALIZED_MIN, 0.0, 1.0, 100);
-    m_pSliderWidget->AddSlider(PT_SLIDER_ESTIMATOR_MAXDISP, "maximum depth in normalized disparities to view (more is yellow)", CCUDADisparityEstimation_OFL_DNORMALIZED_MAX, 0.0, 1.0, 100);
+    m_pSliderWidget->AddSlider(PT_SLIDER_ESTIMATOR_MINDISP, "minimum depth in normalized disparities for depth estimation", CCUDADisparityEstimation_OFL_DNORMALIZED_MIN, 0.0, 1.0, 100);
+    m_pSliderWidget->AddSlider(PT_SLIDER_ESTIMATOR_MAXDISP, "maximum depth in normalized disparities for depth estimation", CCUDADisparityEstimation_OFL_DNORMALIZED_MAX, 0.0, 1.0, 100);
     m_pSliderWidget->AddSlider(PT_SLIDER_ESTIMATOR_SATURATIONTOL, "fraction of pixels allowed to be staturated (after raw image normalization)", 0.05, 0.0, 0.5, 1000);
     // ... parameters controling MLA and main lens
     m_descrMLA.Reset();
@@ -245,12 +247,27 @@ QtPlenopticTools::MainWindow::MainWindow(QWidget *parent) :
     connect(qApp, &QApplication::aboutToQuit, this, &QtPlenopticTools::MainWindow::OnFormExit_triggered);
     connect(ui->actionExit, &QAction::triggered, this, &QtPlenopticTools::MainWindow::OnFormExit_triggered);
 
-        // For linux platforms CUDA takes some time to allocate first memory slot. Force this here...
-        _AppendText("Initializing CUDA...");
-        this->setEnabled(false);
-        PIP_InitializeCUDA();
-        this->setEnabled(true);
-        _AppendText("DONE!");
+    // Test basic CUDA functionality (copy texture to output array)
+	// For linux platforms CUDA takes some time to allocate first memory slot. Force this here...
+	_AppendText("Initializing CUDA...");
+	this->setEnabled(false);
+	try
+	{
+		PIP_InitializeCUDA();
+	}
+	catch (std::exception& exc)
+	{
+		QMessageBox msgBox;
+		msgBox.setText(QString("Initialization of CUDA runtime failed with message:\n") + QString(exc.what()));
+		msgBox.setInformativeText("Try-continue or close program?");
+		msgBox.setStandardButtons(QMessageBox::Retry | QMessageBox::Close);
+		msgBox.setDefaultButton(QMessageBox::Close);
+		// program flow broken, force exit
+		if (msgBox.exec() == QMessageBox::Close)
+			exit(0);
+	}
+	this->setEnabled(true);
+	_AppendText("DONE!");
 
     // Allocate estimators using customization interface.
     _c_AllocateModules();
@@ -360,8 +377,8 @@ void QtPlenopticTools::MainWindow::OnSliderValue_changed(const QString& strIdent
         m_descrMLA.vMlaCenter_px.y = dblValue + 0.5f*float(m_descrMLA.viSensorRes_px.y-1);
         flagMlaChanged = true;
     }
-    else if ((strIdentifier == PT_SLIDER_ESTIMATOR_MINDISP)
-             ||(strIdentifier == PT_SLIDER_ESTIMATOR_MAXDISP)
+    else if ((strIdentifier == PT_SLIDER_OUTPUT_MINDISP)
+             ||(strIdentifier == PT_SLIDER_OUTPUT_MAXDISP)
              ||(strIdentifier == PT_SLIDER_ESTIMATOR_MAXDISPDELTA))
     {
         // If 2.5D depthmap is available draw fusion (last drawn) else colored raw map
@@ -934,8 +951,8 @@ void QtPlenopticTools::MainWindow::_ComputeFusion()
         projTarget.SetCameraParameters( outFLen / projTarget.fPixelsize_mm,
                                         outFLen / projTarget.fPixelsize_mm,
                                         0, vec2<float>( 0, 0 ));
-        // Get approx. distance to far plane of scene given by max. disparity slider
-        float fFarPlaneDist = m_descrMLA.MapDisparityToObjectSpaceDepth(m_pSliderWidget->GetValue(PT_SLIDER_ESTIMATOR_MAXDISP));
+        // Get approx. distance to far plane of scene given by max. disparity visualization slider
+        float fFarPlaneDist = m_descrMLA.MapDisparityToObjectSpaceDepth(m_pSliderWidget->GetValue(PT_SLIDER_OUTPUT_MAXDISP));
         // Project scene center to camera to get new principal point
         vfFusedImagePrincipalPoint = projTarget.Project(vec3<float>(0, 0, fFarPlaneDist));
         // Make PP relative to top-left of image
@@ -991,9 +1008,9 @@ void QtPlenopticTools::MainWindow::_ComputeFusion()
     {
         // normalize depth map and scale to 255 based on set raw depth disparity
         double dMax =
-            -m_descrMLA.MapDisparityToObjectSpaceDepth(m_pSliderWidget->GetValue(PT_SLIDER_ESTIMATOR_MINDISP));
+            -m_descrMLA.MapDisparityToObjectSpaceDepth(m_pSliderWidget->GetValue(PT_SLIDER_OUTPUT_MINDISP));
         double dMin =
-            -m_descrMLA.MapDisparityToObjectSpaceDepth(m_pSliderWidget->GetValue(PT_SLIDER_ESTIMATOR_MAXDISP));
+            -m_descrMLA.MapDisparityToObjectSpaceDepth(m_pSliderWidget->GetValue(PT_SLIDER_OUTPUT_MAXDISP));
 
         // convert to colored map
         CVImage_sptr spTempMap(new CVImage());
@@ -1066,9 +1083,9 @@ void QtPlenopticTools::MainWindow::_ExportImages(const std::string& strFilenameB
         {
             // normalize depth map and scale to 255 based on set raw depth disparity
             double dMax =
-                -m_descrMLA.MapDisparityToObjectSpaceDepth(m_pSliderWidget->GetValue(PT_SLIDER_ESTIMATOR_MINDISP));
+                -m_descrMLA.MapDisparityToObjectSpaceDepth(m_pSliderWidget->GetValue(PT_SLIDER_OUTPUT_MINDISP));
             double dMin =
-                -m_descrMLA.MapDisparityToObjectSpaceDepth(m_pSliderWidget->GetValue(PT_SLIDER_ESTIMATOR_MAXDISP));
+                -m_descrMLA.MapDisparityToObjectSpaceDepth(m_pSliderWidget->GetValue(PT_SLIDER_OUTPUT_MAXDISP));
 
             // convert to colored map
             CVImage_sptr spTempMap(new CVImage());
@@ -1147,8 +1164,8 @@ void QtPlenopticTools::MainWindow::_ExportImages(const std::string& strFilenameB
         if (flagOutPng == true)
         {
             // normalize depth map and scale to 255 based on set raw depth disparity
-            double dMax = (m_pSliderWidget->GetValue(PT_SLIDER_ESTIMATOR_MINDISP));
-            double dMin =(m_pSliderWidget->GetValue(PT_SLIDER_ESTIMATOR_MAXDISP));
+            double dMax = (m_pSliderWidget->GetValue(PT_SLIDER_OUTPUT_MINDISP));
+            double dMin =(m_pSliderWidget->GetValue(PT_SLIDER_OUTPUT_MAXDISP));
 
             // convert to colored map
             CVImage_sptr spTempMap(new CVImage());
@@ -1308,8 +1325,8 @@ void QtPlenopticTools::MainWindow::_DisplayColoredDepth()
     }
 
     // Get depth display bounds
-    const double dblMin = m_pSliderWidget->GetValue(PT_SLIDER_ESTIMATOR_MINDISP);
-    const double dblMax = m_pSliderWidget->GetValue(PT_SLIDER_ESTIMATOR_MAXDISP);
+    const double dblMin = m_pSliderWidget->GetValue(PT_SLIDER_OUTPUT_MINDISP);
+    const double dblMax = m_pSliderWidget->GetValue(PT_SLIDER_OUTPUT_MAXDISP);
     // Create visualization image (range convert, colormap, to RGB)
     spDispImage->CvMat() = 255.0*(spDispImage->CvMat() - dblMin)/(dblMax-dblMin);
     spDispImage->CvMat().convertTo(spDispImage->CvMat(), CV_8UC1);
