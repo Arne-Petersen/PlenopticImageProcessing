@@ -27,6 +27,7 @@ SET(PIPBase_HEADER
   PlenopticTypes.hh
   VectorTypes.hh
   DataIO.hh
+  SimilarityMeasures.hh
 )
 
 # source files to be compiled
