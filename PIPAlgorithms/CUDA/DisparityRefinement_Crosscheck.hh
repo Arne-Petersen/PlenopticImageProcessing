@@ -39,6 +39,8 @@ public:
     /// \param descrMLA description of MLA
     /// \param mapAdditionalParams additional parameters
     ///
+	/// Reads float parameter "Max Disp Difference"
+	///
     /// Exceptions: throws if a required parameter is not in map
     ///
     virtual void SetParameters(const SPlenCamDescription& descrMLA,
