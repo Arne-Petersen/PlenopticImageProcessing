@@ -567,6 +567,9 @@ inline void StartDisparityKernel(const dim3 lensDims, const dim3 threadsPerLensD
         const vec2<float> vGridCenerBlock,
         const vec2<float> vPixelOffset_px)
 {
+	// shared memory for lens offsets and epi lines
+	const int intSharedMem = 6 * 2 * sizeof(float);
+
     // Call kernel with appropriate channel count
     if (intChannelCount == 1)
     {
@@ -657,6 +660,9 @@ void CCUDADisparityEstimation_OFL::EstimateDisparities(CVImage_sptr& spDispartie
 		cudaDeviceGetAttribute(&intMaxThreads, cudaDevAttrMaxThreadsPerBlock, 0);
 		cudaDeviceGetAttribute(&intMaxSharedMem, cudaDevAttrMaxSharedMemoryPerBlock, 0);
 
+		// 6 vec2float needed for lens offsets and epi lines
+		intMaxSharedMem -= 6 * 2 * sizeof(float);
+
 		// get max width of square-sized block ( sqrt(min(maxthreadsX,maxthreadsY,maxthreads))  )
 		intMaxBlockSize = int(sqrtf(float( min(intMaxThreads, min(intMaxBlockDimX, intMaxBlockDimY)) )));
 		// get maximum possible width of square-sized block for given stepcount and available shared mem
@@ -741,7 +747,7 @@ void CCUDADisparityEstimation_OFL::EstimateDisparities(CVImage_sptr& spDispartie
     if (m_params.flagRefine == false)
         return;
 
-    const int intSharedMemSize = DISPSTEPS_REFINE * intNumPixel * sizeof(float);
+    const int intSharedMemSize = DISPSTEPS_REFINE * intNumPixel * sizeof(float) + 6 * 2 * sizeof(float);
     printf("starting refinement kernel with %d tiles, lensDims [%d,%d], threadsPerLensDims [%d,%d], sharted mem %d\n", intNumBlocks*intNumBlocks, lensDims.x, lensDims.y, threadsPerLensDims.x, threadsPerLensDims.y, intSharedMemSize/1024);
 
     // start timer and select appropriate kernel template
