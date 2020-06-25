@@ -27,7 +27,11 @@
 #include <unistd.h>
 #endif // WIN32
 
+//  #define USE_MATCHER_CLASS
+
 using namespace PIP;
+
+#include "PIPBase/SimilarityMeasures.hh"
 
 struct SCudaParams
 {
@@ -102,9 +106,16 @@ __device__ float computeSAD_weighted(cudaTextureObject_t& texPlenopticImage,
     if (DIST2(p2, vTargetLensCenter_px) + float(t_intHWS) > globalParams.descrMla.GetMicroImageRadius_px())
         return globalParams.cmax;
 
+#ifdef USE_MATCHER_CLASS
+	//SSimilarityZNCC<t_intHWS, t_intChannels> matcher;
+	//SSimilaritySAD matcher;
+	SSimilaritySSD matcher;
+	matcher.Set();
+#else USE_MATCHER_CLASS
+	float fCostSum = 0;
+	float fWeightSum = 0;
+#endif // USE_MATCHER_CLASS
 
-    float fCostSum = 0;
-    float fWeightSum = 0;
     for(int i=-t_intHWS; i<=t_intHWS; i++)
     {
         for(int j=-t_intHWS; j<=t_intHWS; j++)
@@ -114,47 +125,63 @@ __device__ float computeSAD_weighted(cudaTextureObject_t& texPlenopticImage,
                 // read pixel intensity (no weight available)
                 const float Ia  = tex2D<float>(texPlenopticImage, p1.x + i +0.5f, p1.y + j +0.5f);
                 const float Iai = tex2D<float>(texPlenopticImage, p2.x + i +0.5f, p2.y + j +0.5f);
-                // add weighted costs
-                fCostSum += fabs(Ia - Iai);
-                // sum up weight
-                fWeightSum += 1;
+#ifdef USE_MATCHER_CLASS
+		 		matcher.AddSample(Ia,Iai);
+#else // USE_MATCHER_CLASS
+				// add weighted costs
+				fCostSum += fabs(Ia - Iai);
+				// sum up weight
+				fWeightSum += 1;
+#endif // USE_MATCHER_CLASS
             }
             else if (t_intChannels == 2)
             {
                 // read pixel intensity and weight (2. channel)
                 const float2 Ia  = tex2D<float2>(texPlenopticImage, p1.x + i +0.5f, p1.y + j +0.5f);
                 float2 Iai = tex2D<float2>(texPlenopticImage, p2.x + i +0.5f, p2.y + j +0.5f);
-                Iai.y *= Ia.y;
-                // add weighted costs
-                fCostSum += fabs(Ia.x - Iai.x) * Iai.y;
-                // sum up weight
-                fWeightSum += Iai.y;
+#ifdef USE_MATCHER_CLASS
+				matcher.AddSample(Ia, Iai);
+#else // USE_MATCHER_CLASS
+				Iai.y *= Ia.y;
+				// add weighted costs
+				fCostSum += fabs(Ia.x - Iai.x) * Iai.y;
+				// sum up weight
+				fWeightSum += Iai.y;
+#endif // USE_MATCHER_CLASS
             }
             else     // channels == 4
             {
                 // read pixel intensities and weight (4. channel)
                 const float4 Ia  = tex2D<float4>(texPlenopticImage, p1.x + i +0.5f, p1.y + j +0.5f);
                 float4 Iai = tex2D<float4>(texPlenopticImage, p2.x + i +0.5f, p2.y + j +0.5f);
-                Iai.w *= Ia.w;
-                // add weighted costs
-                fCostSum += (fabs(Ia.x - Iai.x) + fabs(Ia.y - Iai.y) + fabs(Ia.z - Iai.z)) * Iai.w;
-                // sum up weight
-                fWeightSum += Iai.w;
-            }
+#ifdef USE_MATCHER_CLASS
+				matcher.AddSample(Ia, Iai);
+#else // USE_MATCHER_CLASS				
+				Iai.w *= Ia.w;
+				// add weighted costs
+				fCostSum += (fabs(Ia.x - Iai.x) + fabs(Ia.y - Iai.y) + fabs(Ia.z - Iai.z)) * Iai.w;
+				// sum up weight
+				fWeightSum += Iai.w;
+#endif // USE_MATCHER_CLASS
+			}
         }
     }
 
-    // return normalized SAD. Costs are determined for all colors, need to normalize depending on channel count
-    if ((t_intChannels == 1)||(t_intChannels == 2))
-    {
-        // gray images have only have one cost per pixel (for 2 channels second is alpha weight)
-        return fCostSum / fWeightSum;
-    }
-    else     // 4 channel
-    {
-        // RGB images have have 3 costs per pixel
-        return fCostSum / (3.0f*fWeightSum);
-    }
+#ifdef USE_MATCHER_CLASS
+	return matcher.GetCosts();
+#else // USE_MATCHER_CLASS
+	// return normalized SAD. Costs are determined for all colors, need to normalize depending on channel count
+	if ((t_intChannels == 1) || (t_intChannels == 2))
+	{
+		// gray images have only have one cost per pixel (for 2 channels second is alpha weight)
+		return fCostSum / fWeightSum;
+	}
+	else     // 4 channel
+	{
+		// RGB images have have 3 costs per pixel
+		return fCostSum / (3.0f*fWeightSum);
+	}
+#endif // USE_MATCHER_CLASS
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -513,16 +540,16 @@ __global__ void computeDisparity_refine(float * outputData, float* outputWeights
 #ifdef LENSSTEP2
         if (t_eGridType == EGridType::HEXAGONAL)
         {
-            outputData[index] = float(fCurvature>globalParams.fMinCurvature) * (fMinDisp_px + float(bestIdx) * fDisparityStepsize_px)
+            outputData[index] = float(fCurvature>=globalParams.fMinCurvature) * (fMinDisp_px + float(bestIdx) * fDisparityStepsize_px)
                                 / (1.73205f*globalParams.descrMla.fMicroLensDistance_px);
         }
         else
         {
-            outputData[index] = float(fCurvature>globalParams.fMinCurvature) * (fMinDisp_px + float(bestIdx) * fDisparityStepsize_px)
+            outputData[index] = float(fCurvature>=globalParams.fMinCurvature) * (fMinDisp_px + float(bestIdx) * fDisparityStepsize_px)
                                 / (2.0f*globalParams.descrMla.fMicroLensDistance_px);
         }
 #else // LENSSTEP2
-        outputData[index] = float(fCurvature>globalParams.fMinCurvature) * (fMinDisp_px + float(bestIdx) * fDisparityStepsize_px)
+        outputData[index] = float(fCurvature>=globalParams.fMinCurvature) * (fMinDisp_px + float(bestIdx) * fDisparityStepsize_px)
                             / (globalParams.descrMla.fMicroLensDistance_px);
 #endif // LENSSTEP2
         outputWeights[index] = fCurvature;
