@@ -42,12 +42,12 @@ namespace PIP
 	template<const int t_intHWS, const int t_cntChannels>
 	struct SSimilarityZNCC
 	{
-		__host__ __device__ SSimilarityZNCC() {}
+		__forceinline__ __host__ __device__ SSimilarityZNCC() {}
 
 		///
 		/// \brief Set initializes this for new measure compute
 		///
-		__host__ __device__ void Set()
+		__forceinline__ __host__ __device__ void Set()
 		{
 			sumF = sumT = sumFSquare = sumTSquare = sumFT = 0;
 			sumWeight = 1;
@@ -59,7 +59,7 @@ namespace PIP
 		///
 		/// ONLY VALID FOR t_cntChannels == 4
 		///
-		__host__ __device__ void AddSample(const float4 vecColF, const float4 vecColT)
+		__forceinline__ __host__ __device__ void AddSample(const float4 vecColF, const float4 vecColT)
 		{
 			sumWeight *= vecColF.w*vecColT.w;
 
@@ -77,7 +77,7 @@ namespace PIP
 		///
 		/// ONLY VALID FOR t_cntChannels == 2
 		///
-		__host__ __device__ void AddSample(const float2 vecColF, const float2 vecColT)
+		__forceinline__ __host__ __device__ void AddSample(const float2 vecColF, const float2 vecColT)
 		{
 			sumWeight *= vecColF.y*vecColT.y;
 
@@ -93,7 +93,7 @@ namespace PIP
 		///
 		/// ONLY VALID FOR t_cntChannels == 1
 		///
-		__host__ __device__ void AddSample(const float vecColF, const float vecColT)
+		__forceinline__ __host__ __device__ void AddSample(const float vecColF, const float vecColT)
 		{
 			sumF += vecColF;
 			sumFSquare += vecColF * vecColF;
@@ -105,15 +105,15 @@ namespace PIP
 		///
 		/// \brief GetZNCC returns ZNCC after all smaples were added (in -1..1 with 1 == perfect match)
 		///
-		__host__ __device__ float GetZNCC()
+		__forceinline__ __host__ __device__ float GetZNCC()
 		{
 			// number of summands (number of pixels in patch * color channels except alpha)
 			const float N = ((t_cntChannels == 4)?3:1) * ((2*t_intHWS+1)*(2 * t_intHWS + 1));
 
 			// standard deviation in patch F
-			const float sf = 1.0f / N * std::sqrt(N*sumFSquare - sumF * sumF);
+			const float sf = 1.0f / N * sqrtf(N*sumFSquare - sumF * sumF);
 			// standard deviation in patch T
-			const float st = 1.0f / N * std::sqrt(N*sumTSquare - sumT * sumT);
+			const float st = 1.0f / N * sqrtf(N*sumTSquare - sumT * sumT);
 
 			// return ZNCC or NaN if any pixel during measure was transparent (alpha == 0)
 			return 1.0f / (N * N * sf * st) * (N*sumFT - sumF * sumT) * sumWeight / sumWeight;
@@ -122,7 +122,7 @@ namespace PIP
 		///
 		/// \brief GetCosts returns ZNCC based costs (range 0..1 - full match ... no match)
 		///
-		__host__ __device__ float GetCosts()
+		__forceinline__ __host__ __device__ float GetCosts()
 		{
 			return (1.0f - GetZNCC()) / 2.0f;
 		}
@@ -145,12 +145,12 @@ namespace PIP
 	/// If available alpha channel is used to weight difference summands (small alpha -> smaller influence)
 	struct SSimilaritySAD
 	{
-		__host__ __device__ SSimilaritySAD() {}
+		__forceinline__ __host__ __device__ SSimilaritySAD() {}
 
 		///
 		/// \brief Set initializes this for new measure compute
 		///
-		__host__ __device__ void Set()
+		__forceinline__ __host__ __device__ void Set()
 		{
 			sumDiff = sumWeight = 0;
 		}
@@ -161,13 +161,17 @@ namespace PIP
 		///
 		/// ONLY VALID FOR t_cntChannels == 4
 		///
-		__host__ __device__ void AddSample(const float4 vecColF, const float4 vecColT)
+		__forceinline__ __host__ __device__ void AddSample(const float4& vecColF, const float4& vecColT)
 		{
 			sumWeight += 3.0f*vecColF.w*vecColT.w;
-			sumDiff += ( std::abs(vecColF.x - vecColT.x)
-				         + std::abs(vecColF.y - vecColT.y)
-				         + std::abs(vecColF.z - vecColT.z)
-				       )*vecColF.w*vecColT.w;
+			//sumDiff += (std::abs(vecColF.x - vecColT.x)
+			//	         + std::abs(vecColF.y - vecColT.y)
+			//	         + std::abs(vecColF.z - vecColT.z)
+			//	        )*vecColF.w*vecColT.w;
+			sumDiff += (fabsf(vecColF.x - vecColT.x)
+				+ fabsf(vecColF.y - vecColT.y)
+				+ fabsf(vecColF.z - vecColT.z)
+				)*vecColF.w*vecColT.w;
 		}
 
 		///
@@ -175,11 +179,11 @@ namespace PIP
 		///
 		/// ONLY VALID FOR t_cntChannels == 2
 		///
-		__host__ __device__ void AddSample(const float2 vecColF, const float2 vecColT)
+		__forceinline__ __host__ __device__ void AddSample(const float2& vecColF, const float2& vecColT)
 		{
 			sumWeight += vecColF.y*vecColT.y;
 
-			sumDiff += (std::abs(vecColF.x - vecColT.x)) * vecColF.y*vecColT.y;
+			sumDiff += (fabsf(vecColF.x - vecColT.x)) * vecColF.y*vecColT.y;
 		}
 
 		///
@@ -187,16 +191,16 @@ namespace PIP
 		///
 		/// ONLY VALID FOR t_cntChannels == 1
 		///
-		__host__ __device__ void AddSample(const float vecColF, const float vecColT)
+		__forceinline__ __host__ __device__ void AddSample(const float& vecColF, const float& vecColT)
 		{
 			sumWeight += 1;
-			sumDiff += std::abs(vecColF - vecColT);
+			sumDiff += fabsf(vecColF - vecColT);
 		}
 
 		///
 		/// \brief GetSAD returns weighted (using alpha channel) sum of absolute differences of samples
 		///
-		__host__ __device__ float GetSAD()
+		__forceinline__ __host__ __device__ float GetSAD()
 		{
 			return sumDiff;
 		}
@@ -206,11 +210,87 @@ namespace PIP
 		///
 		/// NOTE: maxDiff correspondes to the maximum possible difference per pixel component (1 for normalized textures)
 		///
-		__host__ __device__ float GetCosts()
+		__forceinline__ __host__ __device__ float GetCosts()
 		{
 			return sumDiff / sumWeight;
 		}
 		
+		/// weighted sum of absolute differences
+		float sumDiff;
+		/// sum of weights, i.e. sum of product of alpha channels : sum_xy(Fxy_alpha*Txy_alpha)
+		float sumWeight;
+	};
+
+	/// Provides sum-of-squared-differences similarity measure
+	/// If available alpha channel is used to weight difference summands (small alpha -> smaller influence)
+	struct SSimilaritySSD
+	{
+		__forceinline__ __host__ __device__ SSimilaritySSD() {}
+
+		///
+		/// \brief Set initializes this for new measure compute
+		///
+		__forceinline__ __host__ __device__ void Set()
+		{
+			sumDiff = sumWeight = 0;
+		}
+
+
+		///
+		/// \brief AddSample adds the absolute difference between input brightness to cost sum
+		///
+		/// ONLY VALID FOR t_cntChannels == 4
+		///
+		__forceinline__ __host__ __device__ void AddSample(const float4& vecColF, const float4& vecColT)
+		{
+			sumWeight += 3.0f*vecColF.w*vecColT.w;
+			sumDiff += ((vecColF.x - vecColT.x)*(vecColF.x - vecColT.x)
+				+ (vecColF.y - vecColT.y)*(vecColF.y - vecColT.y)
+				+ (vecColF.z - vecColT.z)*(vecColF.z - vecColT.z)
+				)*vecColF.w*vecColT.w;
+		}
+
+		///
+		/// \brief AddSample adds the absolute difference between input brightness to cost sum
+		///
+		/// ONLY VALID FOR t_cntChannels == 2
+		///
+		__forceinline__ __host__ __device__ void AddSample(const float2& vecColF, const float2& vecColT)
+		{
+			sumWeight += vecColF.y*vecColT.y;
+
+			sumDiff += ((vecColF.x - vecColT.x)*(vecColF.x - vecColT.x)) * vecColF.y*vecColT.y;
+		}
+
+		///
+		/// \brief AddSample adds the absolute difference between input brightness to cost sum
+		///
+		/// ONLY VALID FOR t_cntChannels == 1
+		///
+		__forceinline__ __host__ __device__ void AddSample(const float& vecColF, const float& vecColT)
+		{
+			sumWeight += 1;
+			sumDiff += (vecColF - vecColT)*(vecColF - vecColT);
+		}
+
+		///
+		/// \brief GetSAD returns weighted (using alpha channel) sum of absolute differences of samples
+		///
+		__forceinline__ __host__ __device__ float GetSAD()
+		{
+			return sumDiff;
+		}
+
+		///
+		/// \brief GetCosts returns SAD based costs (range 0..maxDiff - full match ... no match)
+		///
+		/// NOTE: maxDiff correspondes to the maximum possible difference per pixel component (1 for normalized textures)
+		///
+		__forceinline__ __host__ __device__ float GetCosts()
+		{
+			return sumDiff / sumWeight;
+		}
+
 		/// weighted sum of absolute differences
 		float sumDiff;
 		/// sum of weights, i.e. sum of product of alpha channels : sum_xy(Fxy_alpha*Txy_alpha)
