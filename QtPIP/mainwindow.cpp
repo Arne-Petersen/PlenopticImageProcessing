@@ -181,7 +181,7 @@ QtPlenopticTools::MainWindow::MainWindow(QWidget *parent) :
 	m_pSliderWidget->AddSlider(PT_SLIDER_OUTPUT_MAXDISP, "maximum depth for coloring of depth maps in view (more is yellow)", CCUDADisparityEstimation_OFL_DNORMALIZED_MAX, 0.0, 1.0, 100);
 	// ... parameters controling raw depth estimation
     m_pSliderWidget->AddGroupLabel(":1group", "Estimator Properties", "");
-    m_pSliderWidget->AddSlider(PT_SLIDER_ESTIMATOR_MINCURVE, "minimum curvature for filtering", 0.0, 0.0, 1.0, 1000);
+    m_pSliderWidget->AddSlider(PT_SLIDER_ESTIMATOR_MINCURVE, "minimum curvature for filtering", 0.0001, 0.0, 1.0, 10000);
     m_pSliderWidget->AddSlider(PT_SLIDER_ESTIMATOR_MAXDISPDELTA, "maximum difference between disparities if crosscheck", 1.0, 0.0, 10.0, 10000);
     m_pSliderWidget->AddSlider(PT_SLIDER_ESTIMATOR_MINDISP, "minimum depth in normalized disparities for depth estimation", CCUDADisparityEstimation_OFL_DNORMALIZED_MIN, 0.0, 1.0, 100);
     m_pSliderWidget->AddSlider(PT_SLIDER_ESTIMATOR_MAXDISP, "maximum depth in normalized disparities for depth estimation", CCUDADisparityEstimation_OFL_DNORMALIZED_MAX, 0.0, 1.0, 100);
