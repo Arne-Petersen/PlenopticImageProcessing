@@ -145,6 +145,9 @@ __global__ void computeCrosscheck(float* outputDisparities, cudaTextureObject_t 
                                        *globalMlaDescr.fMicroLensDistance_px;
 #endif // SECONDLENSLEVEL
 
+		if (fTargetDisparity_px == 0)
+			continue;
+
         // Check validity and update mean
         if  ((vTargetPixel_px - globalMlaDescr.GetMicroImageCenter_px<t_eGridType>(vTargetLensIdcs[i])).length() //+ 1.0f
              < globalMlaDescr.GetMicroImageRadius_px())
