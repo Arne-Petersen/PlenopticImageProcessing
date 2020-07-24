@@ -160,7 +160,7 @@ void PIP::QtPIP::CQtSliderWidget::Clear()
 {
     // Free allocated layout
     delete this->layout();
-    // Remove all items from parenting and free
+    // CudaRemove all items from parenting and free
     qDeleteAll(this->children());
     // Generate new layout
     this->setLayout(new QGridLayout());
@@ -227,7 +227,7 @@ void PIP::QtPIP::CQtSliderWidget::ModifySlider(const std::string& strOldIdentifi
     // Change name of slider in mapping. 'itMap =' to make iterator point to new element
     if (strNewIdentifier != "")
     {
-        // Remove old entry
+        // CudaRemove old entry
         m_mapIdentifierToIndices.erase(itMap);
         // Add new entry, keep itMap valid
         itMap = m_mapIdentifierToIndices.insert(std::pair<std::string, unsigned>(strNewIdentifier, nSliderIndex)).first;
@@ -275,12 +275,12 @@ void PIP::QtPIP::CQtSliderWidget::RemoveSlider(const std::string& strIdentifier)
     // Get index of slider in memver vectors
     const unsigned nSliderIndex = itMap->second;
 
-    // Remove all entries for slider given slider index
+    // CudaRemove all entries for slider given slider index
     m_vecPropertyTypes.erase(m_vecPropertyTypes.begin() + nSliderIndex);
     m_vecMinima.erase(m_vecMinima.begin() + nSliderIndex);
     m_vecMaxima.erase(m_vecMaxima.begin() + nSliderIndex);
     m_vecNumSteps.erase(m_vecNumSteps.begin() + nSliderIndex);
-    // Remove and delete items from layout. Delete entries in member vectors
+    // CudaRemove and delete items from layout. Delete entries in member vectors
     m_vecLabelsName[nSliderIndex]->deleteLater();
     m_vecLabelsName.erase(m_vecLabelsName.begin() + nSliderIndex);
     m_vecSliders[nSliderIndex]->deleteLater();
