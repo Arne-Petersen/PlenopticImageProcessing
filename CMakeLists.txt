@@ -61,9 +61,9 @@ SET(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 INCLUDE_DIRECTORIES(${PLENOPTICIMAGEPROCESSING_SOURCE_DIR} ${PLENOPTICIMAGEPROCESSING_BINARY_DIR} )
 
 # Set default paths for compiler and linker output
-SET(LIBRARY_OUTPUT_PATH "${PLENOPTICIMAGEPROCESSING_BINARY_DIR}/lib/" CACHE PATH "Single output directory for all static/symbol libraries")
-SET(BINARY_OUTPUT_PATH "${PLENOPTICIMAGEPROCESSING_BINARY_DIR}/bin/" CACHE PATH "Single output directory for all shared libraries")
-SET(EXECUTABLE_OUTPUT_PATH "${PLENOPTICIMAGEPROCESSING_BINARY_DIR}/bin/" CACHE PATH "Single output directory for all executables")
+SET(LIBRARY_OUTPUT_PATH "${CMAKE_BINARY_DIR}/lib/" CACHE PATH "Single output directory for all static/symbol libraries")
+SET(BINARY_OUTPUT_PATH "${CMAKE_BINARY_DIR}/bin/" CACHE PATH "Single output directory for all shared libraries")
+SET(EXECUTABLE_OUTPUT_PATH "${CMAKE_BINARY_DIR}/bin/" CACHE PATH "Single output directory for all executables")
 
 IF (WIN32)
   # avoid subfolder structure from VisualStudio.
