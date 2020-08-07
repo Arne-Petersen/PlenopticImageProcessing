@@ -21,6 +21,9 @@
 
 #include <cstring>
 
+#include "cuda.h"
+#include "cuda_runtime.h"
+
 #include "VectorTypes.hh"
 
 namespace PIP

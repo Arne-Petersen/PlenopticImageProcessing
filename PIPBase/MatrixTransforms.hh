@@ -21,18 +21,8 @@
 
 #include <cmath>
 
-#ifdef MODULEFRAMEWORK_HAS_CUDA
-    #include "cuda.h"
-    #include "cuda_runtime.h"
-#else
-    // set empty CUDA defines
-    #ifndef __device__
-        #define __device__
-    #endif
-    #ifndef __host__
-        #define  __host__
-    #endif
-#endif // MODULEFRAMEWORK_HAS_CUDA
+#include "cuda.h"
+#include "cuda_runtime.h"
 
 #include "MatrixTypes.hh"
 
