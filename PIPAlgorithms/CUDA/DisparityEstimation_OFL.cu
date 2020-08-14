@@ -27,7 +27,7 @@
 #include <unistd.h>
 #endif // WIN32
 
-//  #define USE_MATCHER_CLASS
+  #define USE_MATCHER_CLASS
 
 using namespace PIP;
 
