@@ -111,7 +111,7 @@ __device__ float computeSAD_weighted(cudaTextureObject_t& texPlenopticImage,
 	//SSimilaritySAD matcher;
 	SSimilaritySSD matcher;
 	matcher.Set();
-#else USE_MATCHER_CLASS
+#else // USE_MATCHER_CLASS
 	float fCostSum = 0;
 	float fWeightSum = 0;
 #endif // USE_MATCHER_CLASS
@@ -568,12 +568,12 @@ inline void StartDisparityKernel(const dim3 lensDims, const dim3 threadsPerLensD
         const vec2<float> vPixelOffset_px)
 {
 	// shared memory for lens offsets and epi lines
-	const int intSharedMem = 6 * 2 * 2 * sizeof(float);
+    const int intSharedMem = 6 * 4 * sizeof(float);
 
     // Call kernel with appropriate channel count
     if (intChannelCount == 1)
     {
-        computeDisparity<DISPSTEPS_INITIAL, HWS_INITIAL, 1, t_eGridType><<<lensDims, threadsPerLensDims, intSharedMem >>>(arrOutput.GetDevicePointer(),
+        computeDisparity<DISPSTEPS_INITIAL, HWS_INITIAL, 1, t_eGridType><<<lensDims, threadsPerLensDims, intSharedMem>>>(arrOutput.GetDevicePointer(),
                                                                                                            arrOutWeightSum.GetDevicePointer(),
                                                                                                            texInput.GetTextureObject(),
                                                                                                            vGridCenerBlock,
@@ -581,7 +581,7 @@ inline void StartDisparityKernel(const dim3 lensDims, const dim3 threadsPerLensD
     }
     else if (intChannelCount == 2)
     {
-        computeDisparity<DISPSTEPS_INITIAL, HWS_INITIAL, 2, t_eGridType><<<lensDims, threadsPerLensDims, intSharedMem >>>(arrOutput.GetDevicePointer(),
+        computeDisparity<DISPSTEPS_INITIAL, HWS_INITIAL, 2, t_eGridType><<<lensDims, threadsPerLensDims, intSharedMem>>>(arrOutput.GetDevicePointer(),
                                                                                                            arrOutWeightSum.GetDevicePointer(),
                                                                                                            texInput.GetTextureObject(),
                                                                                                            vGridCenerBlock,
@@ -589,7 +589,7 @@ inline void StartDisparityKernel(const dim3 lensDims, const dim3 threadsPerLensD
     }
     else
     {
-        computeDisparity<DISPSTEPS_INITIAL, HWS_INITIAL, 4, t_eGridType><<<lensDims, threadsPerLensDims>>>(arrOutput.GetDevicePointer(),
+        computeDisparity<DISPSTEPS_INITIAL, HWS_INITIAL, 4, t_eGridType><<<lensDims, threadsPerLensDims, intSharedMem>>>(arrOutput.GetDevicePointer(),
                                                                                                            arrOutWeightSum.GetDevicePointer(),
                                                                                                            texInput.GetTextureObject(),
                                                                                                            vGridCenerBlock,

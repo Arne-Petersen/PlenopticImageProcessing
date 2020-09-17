@@ -22,14 +22,7 @@
 #include <math.h>
 
 // compile CUDA device/host interface depending on nvcc/c++ compiler
-#ifndef __NVCC__
-#ifndef __device__
-    #define __device__
-#endif
-#ifndef __host__
-    #define  __host__
-#endif
-#endif //__NVCC__
+
 
 // Frequently used for hexagonal structures = sin(1/3 * pi)
 #define SINPIBYTHREE 0.8660254037844386467637231707529361835

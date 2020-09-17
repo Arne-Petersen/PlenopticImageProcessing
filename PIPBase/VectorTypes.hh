@@ -25,14 +25,6 @@
 #include "cuda.h"
 #include "cuda_runtime.h"
 
-// set empty CUDA defines if needed
-#ifndef __device__
-#define __device__
-#endif
-#ifndef __host__
-#define  __host__
-#endif
-
 namespace PIP
 {
     /////////////////////////////////////////////////////////////////////////////////////////////
