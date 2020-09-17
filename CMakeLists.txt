@@ -101,18 +101,12 @@ OPTION(BUILD_MFEXAMPLES "Build MODULEFRAMEWORK with examples." ON)
 ## Mandatory : get opencv package
 # find OpenCV cmake configuration file
 FIND_PACKAGE(OpenCV REQUIRED PATHS $ENV{OpenCV_DIR} ${OpenCV_DIR})
-# find OpenCVs header files
-FIND_PATH(OpenCV_INCLUDE_DIR opencv2/opencv.hpp PATHS ${OpenCV_INCLUDE_DIR} $ENV{OpenCV_INCLUDE_DIR} /usr/local/include /usr/include)
-IF (NOT OpenCV_INCLUDE_DIR)
+# check OpenCVs include dirs, just to be sure...
+IF (NOT OpenCV_INCLUDE_DIRS)
   MESSAGE(SEND_ERROR "opencv header not found.")
-ENDIF (NOT OpenCV_INCLUDE_DIR)
-FIND_PATH(OpenCV_LIBRARIES_DIR NAMES libopencv_core.so PATHS /usr/lib/x86_64-linux-gnu/ /usr/lib/ ${OpenCV_DIR}/lib)
-IF (NOT OpenCV_LIBRARIES_DIR)
-  MESSAGE(SEND_ERROR "opencv libraries directory not found.")
-ENDIF (NOT OpenCV_LIBRARIES_DIR)
-# add to link/include directories
+ENDIF (NOT OpenCV_INCLUDE_DIRS)
+# add to include directories
 INCLUDE_DIRECTORIES(${OpenCV_INCLUDE_DIRS})
-LINK_DIRECTORIES(${OpenCV_DIR}/lib)
 
 ## Find Qt GUI support, fatal error if not found (works for 'all' tested Qt5 versions)
 find_package(Qt5Widgets REQUIRED)
