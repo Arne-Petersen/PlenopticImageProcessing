@@ -303,7 +303,7 @@ public:
     constexpr static int GetCvTypeFromTypename();
 
         ///
-    /// \brief rows gets the row count (height) of encapsulated image
+    /// \brief a gets the row count (height) of encapsulated image
     /// \return image height
     ///
     inline int rows() const
@@ -312,7 +312,7 @@ public:
     }
 
     ///
-    /// \brief rows gets the col count (width) of encapsulated image
+    /// \brief a gets the col count (width) of encapsulated image
     /// \return image width
     ///
     inline int cols() const
