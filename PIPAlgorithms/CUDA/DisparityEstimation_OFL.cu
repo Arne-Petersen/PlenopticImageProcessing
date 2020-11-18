@@ -111,7 +111,7 @@ __device__ float computeSAD_weighted(cudaTextureObject_t& texPlenopticImage,
 	//SSimilaritySAD matcher;
 	SSimilaritySSD matcher;
 	matcher.Set();
-#else USE_MATCHER_CLASS
+#else
 	float fCostSum = 0;
 	float fWeightSum = 0;
 #endif // USE_MATCHER_CLASS
@@ -568,7 +568,7 @@ inline void StartDisparityKernel(const dim3 lensDims, const dim3 threadsPerLensD
         const vec2<float> vPixelOffset_px)
 {
 	// shared memory for lens offsets and epi lines
-	const int intSharedMem = 6 * 2 * sizeof(float);
+//	const int intSharedMem = 6 * 2 * sizeof(float);
 
     // Call kernel with appropriate channel count
     if (intChannelCount == 1)
@@ -666,7 +666,7 @@ void CCUDADisparityEstimation_OFL::EstimateDisparities(CVImage_sptr& spDispartie
 		// get max width of square-sized block ( sqrt(min(maxthreadsX,maxthreadsY,maxthreads))  )
 		intMaxBlockSize = int(sqrtf(float( min(intMaxThreads, min(intMaxBlockDimX, intMaxBlockDimY)) )));
 		// get maximum possible width of square-sized block for given stepcount and available shared mem
-		int intSharedMemStepBlockSize = int(floorf(sqrtf(float(intMaxSharedMem/(4* DISPSTEPS_REFINE)))));
+		int intSharedMemStepBlockSize = int(floorf(sqrtf( floorf(float(intMaxSharedMem)/float(4* DISPSTEPS_REFINE)))));
 
 		// choose minimum of upper limits
 		intBlockSize = min(intMaxBlockSize, intSharedMemStepBlockSize);

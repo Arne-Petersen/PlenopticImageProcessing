@@ -164,8 +164,8 @@ namespace PIP
         template<typename S>
         __host__ __device__ void TypeConvert(vec2<S>& vecConverted)
         {
-            vecConverted.x = this->x;
-            vecConverted.y = this->y;
+            vecConverted.x = (T)this->x;
+            vecConverted.y = (T)this->y;
         }
     };
 

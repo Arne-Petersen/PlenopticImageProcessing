@@ -21,6 +21,7 @@
 #include "PIPBase/PlenopticTypes.hh"
 #include "PIPAlgorithms/AlgorithmInterfaces.hh"
 
+template <typename... Args> inline void unused(Args&&...) {}
 /////////////////////////////////////////////////////////////////////////
 namespace  PIP
 {
@@ -51,6 +52,7 @@ public:
         m_descrMLA = descrMLA;
         m_projTarget = projTarget;
         // no additional parameters used by this
+        unused(mapAdditionalParams);
     }
 
     ///

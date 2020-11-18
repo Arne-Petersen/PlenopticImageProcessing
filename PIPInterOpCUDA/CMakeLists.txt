@@ -21,6 +21,7 @@
 SET(PIPInterOpCUDA_CUDA_SRCS CUDA/CudaHelper.hh CUDA/CudaHelper.cu)
 # Add library for static linking
 PIP_ADD_LIBRARY(PIPInterOpCUDA_CUDA STATIC ${PIPInterOpCUDA_CUDA_SRCS})
+TARGET_COMPILE_OPTIONS(PIPInterOpCUDA_CUDA PUBLIC $<$<COMPILE_LANGUAGE:CUDA>:-gencode arch=compute_35,code=sm_35 --keep>)
 # Enable c++11 in CUDA compile. 'should' have been inherited from host compiler
 
 # Add C++ sources
