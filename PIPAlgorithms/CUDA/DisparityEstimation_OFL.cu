@@ -688,7 +688,7 @@ void CCUDADisparityEstimation_OFL::EstimateDisparities(CVImage_sptr& spDispartie
 
     // Call kernel
     // Each block represents a lens, each thread processes one pixel
-    dim3 threadsPerLensDims = dim3(intNumPixelX, intNumPixelX);
+    dim3 threadsPerLensDims = dim3(intNumPixelX-2, intNumPixelX-2);
     dim3 lensDims = dim3( intNumLensXdir, intNumLensYdir );
     // Center block corresponds to lens index (0,0)
     vec2<float> vGridCenerBlock;
