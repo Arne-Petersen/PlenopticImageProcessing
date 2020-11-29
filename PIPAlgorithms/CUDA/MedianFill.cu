@@ -54,9 +54,9 @@ __global__ void computeMedianFill(float* outputFilledMap, cudaTextureObject_t te
     float fActiveDepth = fDepths[t_intHWS*filterSize + t_intHWS];
 
     // simple array sort...
-    for(int i=0; i<=filterSize*filterSize; i++)
+    for(int i=0; i < filterSize*filterSize-1; i++)
     {
-        for(int j=0; j<=filterSize*filterSize-i; j++)
+        for(int j=0; j < filterSize*filterSize-i-1; j++)
         {
             if(fDepths[j]>fDepths[j+1])
             {
@@ -72,13 +72,15 @@ __global__ void computeMedianFill(float* outputFilledMap, cudaTextureObject_t te
     float fMedian = 0;//fDepths[numValids/2];
     for (int i=0; i<filterSize*filterSize; i++)
     {
-        numInvalids += int(fDepths[i] == 0);
-        if (i-numInvalids == (filterSize*filterSize-numInvalids)/2)
-        {
-            fMedian = fDepths[i];
-            break;
-        }
+        numInvalids += int(fDepths[i] == 0 ? 1 : 0);
+//        if (i-numInvalids == (filterSize*filterSize-numInvalids)/2)
+//        {
+//            fMedian = fDepths[i];
+//            break;
+//        }
     }
+
+    fMedian = fDepths[numInvalids + (filterSize*filterSize - numInvalids) / 2];
 
     //printf("act : %g ; med : %g\n",fActiveDepth, fMedian);
 
@@ -91,13 +93,15 @@ __global__ void computeMedianFill(float* outputFilledMap, cudaTextureObject_t te
     int index = int(vPixelPos_px.y) * intWidth + int(vPixelPos_px.x);
     if (t_flagSmoothing == true)
     {
+        float multiplier = fMedian != 0.0f ? 1.0f : 0.0f;
         // Write valid median even if active depth is valid
-        outputFilledMap[index] = float(fMedian != 0) * fMedian + float(fMedian == 0) * fActiveDepth;
+        outputFilledMap[index] = multiplier * fMedian + (1.0f - multiplier) * fActiveDepth;
     }
     else
     {
+        float multiplier = fActiveDepth == 0.0f ? 1.0f : 0.0f;
         // Write median only if active depth is invalid
-        outputFilledMap[index] = float(fActiveDepth == 0) * fMedian + float(fActiveDepth != 0) * fActiveDepth;
+        outputFilledMap[index] = multiplier * fMedian + (1.0f - multiplier) * fActiveDepth;
     }
 }
 
