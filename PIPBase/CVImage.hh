@@ -253,6 +253,7 @@ public:
         }
         // Allocate new cv mat for image
         m_pMatCvImage = new cv::Mat(int(descrImageData.intHeight), int(descrImageData.intWidth), descrImageData.intCvStorageType);
+        flagOwner = true;
 
         // Set data type in  meta data
         descrMetaData.eImageType = descrImageData.eImageType;
