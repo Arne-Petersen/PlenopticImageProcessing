@@ -54,9 +54,9 @@ __global__ void computeMedianFill(float* outputFilledMap, cudaTextureObject_t te
     float fActiveDepth = fDepths[t_intHWS*filterSize + t_intHWS];
 
     // simple array sort...
-    for(int i=0; i<=filterSize*filterSize; i++)
+    for(int i=0; i<filterSize*filterSize; i++)
     {
-        for(int j=0; j<=filterSize*filterSize-i; j++)
+        for(int j=0; j<filterSize*filterSize-i-1; j++)
         {
             if(fDepths[j]>fDepths[j+1])
             {
